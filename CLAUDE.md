@@ -4,12 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-**cairn** is a system for managing a **Register of Processing Activities (ROPA)** that meets UK ICO / UK GDPR Article 30 requirements. The repository is currently **design-stage only** — there is no application code, build system, or tests yet. Two specification documents define what will be built:
+**Cairn** is a system for managing a **Record of Processing Activities (ROPA)** that meets UK ICO / UK GDPR Article 30 requirements. The repository is currently **design-stage only** — there is no application code, build system, or tests yet. Three documents define what will be built and how:
 
+- `docs/Cairn-project-plan.md` — **Project Plan v0.1**. The delivery roadmap: outcome-based phases 0–6 (design → architecture → build → test → migrate/pilot → go-live → operate) and cross-cutting workstreams. The "how and when". Roadmap-level only — resourcing, durations and costs are deferred.
 - `docs/ROPA-tool-plan.md` — **Plan v0.12**. High-level data architecture, legal basis, and design decisions. The "why".
 - `docs/ROPA-tool-field-spec.md` — **Spec v0.3**. Concrete, buildable field-level specification derived from the plan. The "what to build". Section references (e.g. "Plan §3.2") point back into the plan.
 
-When starting implementation, treat the field spec as authoritative for entities, fields, types, and validation rules; consult the plan for the reasoning behind a decision. The spec tags any field-level decision that refines the plan with `[spec clarification]` — these never contradict the plan.
+When starting implementation, treat the field spec as authoritative for entities, fields, types, and validation rules; consult the plan for the reasoning behind a decision; consult the project plan for phase sequencing and scope-of-phase. The spec tags any field-level decision that refines the plan with `[spec clarification]` — these never contradict the plan.
+
+**Naming:** the system is **Cairn**. The plan and spec still carry the working "ROPA Tool" branding; applying the Cairn name across them is a deferred Phase 0 step, so expect both names in the docs for now.
 
 ## Core architecture (read before building)
 
@@ -50,6 +53,6 @@ Every entity implicitly carries `id`, `created_at/updated_at`, `created_by/updat
 
 ## Conventions
 
-- Build order is defined in Plan §6 (stages 1a–1e, then stage 2 for DUAA alignment). Stage 1a builds the core + routers + config seams and populates the FRS pack.
+- The overall delivery roadmap is the project plan's phases 0–6. Application build order lives in Phase 2, sub-phases 2a–2f (Project Plan §5), which track Plan §6 (2a–2e ≈ Plan stages 1a–1e; 2f ≈ Plan stage 2, DUAA alignment). Sub-phase 2a builds the core + routers + config seams and populates the FRS pack.
 - Legal accuracy matters: the vocabularies (Schedule 1/8 conditions, lawful bases) are seeded from specific legislation. Verify against the latest *revised* legislation for DUAA amendments before seeding (Spec §11).
 - Terminology watch-item: "ICO" is being reconstituted as the "Information Commission" under DUAA Part 6 — export labels will eventually change.

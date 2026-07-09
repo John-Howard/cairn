@@ -654,4 +654,4 @@ A combined internal register exports all activities across every view for day-to
 
 ---
 
-*Derived from Plan v0.12 (`ROPA-tool-plan.md`). This spec is v0.3 and will iterate alongside it.*
+*Derived from Plan v0.12 (`ROPA-tool-plan.md`). This spec is v0.1 and will iterate alongside it.*

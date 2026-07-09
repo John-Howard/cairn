@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://cairn:cairn@db:5432/cairn
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cairn
+      POSTGRES_PASSWORD: cairn
+      POSTGRES_DB: cairn
+    volumes:
+      - cairn-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cairn -d cairn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cairn-db-data:

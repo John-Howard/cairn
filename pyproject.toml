@@ -4,11 +4,14 @@ version = "0.1.0"
 description = "Single-tenant, configurable Record of Processing Activities (ROPA) and accountability tool"
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi>=0.139.0",
     "sqlalchemy>=2.0.51",
+    "uvicorn>=0.51.0",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.4",
     "ruff>=0.12",
 ]

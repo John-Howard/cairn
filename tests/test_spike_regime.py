@@ -1,10 +1,11 @@
 import pytest
 from sqlalchemy import select
 
-from cairn.audit import capture_version, snapshot
+from cairn.audit import snapshot
 from cairn.export import export_views
 from cairn.models import (
     ActivityDomain,
+    APDScope,
     AuditEvent,
     LawfulBasisRecord,
     RecordVersion,
@@ -20,6 +21,7 @@ from cairn.regime import (
     set_regime_policy,
 )
 from cairn.rules import evaluate
+from conftest import art6, make_apd, schedule1
 
 
 def flip_policy(session, regime, actor, reason):
@@ -67,7 +69,7 @@ def test_policy_flip_to_part2_switches_set_and_retains_part3(
     retained = inactive_basis(enforcement_activity)
     assert retained is not None
     assert retained.regime_scope == RegimeScope.PART3
-    assert retained.s35_basis == "s35_task"
+    assert retained.s35_basis.code == "s35_task"
 
     events = activity_regime_changes(session, enforcement_activity)
     assert len(events) == 1
@@ -79,13 +81,19 @@ def test_policy_flip_to_part2_switches_set_and_retains_part3(
 
     assert export_views(enforcement_activity, frs_profile) == {"art30_1"}
 
+    apd = make_apd(
+        session,
+        title="APD — Enforcement (Schedule 1)",
+        scope=APDScope.SCHEDULE1,
+        document_ref="apd_enforcement",
+    )
     enforcement_activity.basis_records.append(
         LawfulBasisRecord(
             regime_scope=RegimeScope.PART2,
-            art6_basis="e",
+            art6_basis=art6(session, "e"),
             art10_basis="schedule1_para_10",
-            schedule1_condition="para_10_unlawful_acts",
-            apd_ref="apd_enforcement",
+            schedule1_condition=schedule1(session, 10),
+            apd=apd,
         )
     )
     session.flush()
@@ -133,7 +141,7 @@ def test_manual_override_requires_reason_and_pins_regime(
 
 def test_version_history_captured_on_edit(session, frs_profile, enforcement_activity, actor):
     original_purpose = enforcement_activity.purpose
-    capture_version(session, enforcement_activity, changed_by=actor, change_note="Broaden purpose")
+    enforcement_activity.change_note = "Broaden purpose"
     enforcement_activity.purpose = "Investigate, enforce and prosecute fire-safety breaches."
     session.flush()
 

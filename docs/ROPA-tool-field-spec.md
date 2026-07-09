@@ -1,6 +1,6 @@
 # ROPA Tool — Field-Level Build Specification
 
-**Status:** Spec v0.3 — for iteration.
+**Status:** Spec v0.4 — for iteration. v0.4 applies two field-level clarifications validated by the Phase 1.7 architecture spike (`spike-findings.md`): the `regime_scope` dual-mapping discriminator (§6.1) and the unified regime enum (§2.2).
 **Derived from:** *ROPA Tool — High-Level Plan & Data Architecture*, **Plan v0.12** (`ROPA-tool-plan.md`). Section references below (e.g. Plan §3.2) point to that document. This spec turns the agreed architecture into concrete, buildable fields; it does not re-argue design decisions.
 **Convention for divergences:** where this spec makes a field-level decision the plan left implicit, it is tagged **[spec clarification]**. These refine, and never contradict, Plan v0.12.
 
@@ -71,7 +71,7 @@ One row per enforcement-domain function; the switch behind the configurable Part
 | Field | Type | Req | Default | Notes |
 |-------|------|-----|---------|-------|
 | `activity_domain` | enum(fire_safety_enforcement, fire_investigation, firesetter_intervention, other) | Y | — | Per-function granularity (Plan §7) |
-| `assigned_regime` | enum(part2, law_enforcement) | Y | `part2` | The default regime inherited by activities in this domain |
+| `assigned_regime` | enum(general, law_enforcement) | Y | `general` | The default regime inherited by activities in this domain. **[spec clarification]** unified with the activity `regime` enum (§3) — Plan §1.6a's `part2` value corresponds to `general` here; `part2`/`part3` are reserved for the Lawful Basis Record's mapping scope (§6.1) |
 | `rationale` | longtext | Y | — | Why this classification |
 | `last_changed_by` | fk → User | D | — | Audited |
 | `last_changed_at` | datetime | D | — | Audited |
@@ -173,16 +173,20 @@ Each is a managed controlled vocabulary. Common shape: `id`, `label`, plus the a
 ## 6. Supporting / linked records (Plan §3.5)
 
 ### 6.1 Lawful Basis Record
+
+**[spec clarification]** The dual mapping (Plan §1.6a) is realised as **one Lawful Basis Record per regime per activity**, discriminated by `regime_scope` and unique on (`activity_id`, `regime_scope`). The record whose scope matches the activity's active `regime` (`general` → `part2`, `law_enforcement` → `part3`) is authoritative; the other is retained, dormant, and untouched by regime changes. Conditional requirements below therefore key off the **record's scope**, not the activity's live regime — a dormant mapping keeps its own completeness. Validated by the Phase 1.7 spike.
+
 | Field | Type | Req | Notes |
 |-------|------|-----|-------|
-| `activity_id` | fk → Processing Activity | Y | |
-| `art6_basis` | fk → Lawful Basis general | C | Required when regime = general |
-| `art6_justification` | longtext | Y | |
-| `art9_condition` | fk → Special Category Condition | C | Required when `special_category_flag` |
+| `activity_id` | fk → Processing Activity | Y | Unique with `regime_scope` |
+| `regime_scope` | enum(part2, part3) | Y | **[spec clarification]** dual-mapping discriminator (see note above) |
+| `art6_basis` | fk → Lawful Basis general | C | Required on `part2`-scope records |
+| `art6_justification` | longtext | C | Required on `part2`-scope records |
+| `art9_condition` | fk → Special Category Condition | C | Required when `special_category_flag` (`part2` scope) |
 | `schedule1_condition` | fk → Schedule 1 Condition | C | Required when the Art 9 condition `needs_schedule1` |
-| `art10_basis` | text | C | Required when `criminal_offence_flag` (official authority or Sch 1) |
-| `s35_basis` | fk → Lawful Basis LE | C | Required when regime = law_enforcement |
-| `schedule8_condition` | fk → Schedule 8 Condition | C | Required for LE sensitive processing |
+| `art10_basis` | text | C | Required when `criminal_offence_flag` (official authority or Sch 1; `part2` scope) |
+| `s35_basis` | fk → Lawful Basis LE | C | Required on `part3`-scope records |
+| `schedule8_condition` | fk → Schedule 8 Condition | C | Required for LE sensitive processing (`part3` scope) |
 | `apd_id` | fk → Appropriate Policy Document | C | Required when Art 9/Sch 1 or s42 needs an APD |
 
 ### 6.2 Consent Record (Plan review R1/R2; rule 6)
@@ -467,6 +471,7 @@ Two linked activities demonstrating the external-data → modelling → lineage 
   "activity_datasource": ["eds_acorn", "eds_adultcare"],
   "activity_feeds": ["act_hfsv_operational"],
   "lawful_basis_record": {
+    "regime_scope": "part2",
     "art6_basis": "e",
     "art6_justification": "Statutory community fire safety function (FRSA 2004 s6).",
     "art9_condition": "g",
@@ -512,6 +517,7 @@ Rules fired: 1, 2, 7, 8 (automated), 9 (inferred), 10 (modelling + record lineag
   "owner_id": "user_prevention_lead",
   "next_review_at": "2026-12-01",
   "lawful_basis_record": {
+    "regime_scope": "part2",
     "art6_basis": "e",
     "art6_justification": "Statutory community fire safety function (FRSA 2004 s6).",
     "art9_condition": "g",
@@ -578,6 +584,7 @@ Fire-safety enforcement, where the Regime Policy classifies `fire_safety_enforce
   "next_review_at": "2026-10-01",
 
   "lawful_basis_record": {
+    "regime_scope": "part3",
     "s35_basis": "s35_task",
     "schedule8_condition": "sch8_1_statutory",
     "apd_id": "apd_s42_enforcement"
@@ -588,7 +595,7 @@ Fire-safety enforcement, where the Regime Policy classifies `fire_safety_enforce
 
 Rules fired: 12 (regime routing → s61 set + `s35_basis` + Sch 8 + s42 APD + flag s62 systems), 16, 17, plus DPIA. Note the general-regime rules 3 (Art 10) and 4 (public-authority guard) do **not** apply here — the LE regime uses s35, not Art 6/9/10.
 
-**Configurable-boundary illustration (Plan §1.6a):** if the Regime Policy for this domain were flipped to `part2`, the *same* activity would instead require the general set — `art6_basis = e` (public task), `art10_basis` (criminal offence), a Schedule 1 condition (e.g. para 10, preventing/detecting unlawful acts) and an APD — with the s35/Sch 8 mapping retained but dormant. This is the "dual mapping, one active" behaviour.
+**Configurable-boundary illustration (Plan §1.6a):** if the Regime Policy for this domain were flipped to `part2`, the *same* activity would instead require the general set — `art6_basis = e` (public task), `art10_basis` (criminal offence), a Schedule 1 condition (e.g. para 10, preventing/detecting unlawful acts) and an APD — with the s35/Sch 8 mapping retained but dormant. This is the "dual mapping, one active" behaviour — in field terms, each mapping is its own Lawful Basis Record distinguished by `regime_scope` (§6.1).
 
 ---
 
@@ -651,7 +658,8 @@ A combined internal register exports all activities across every view for day-to
 - **Record vs authoring state** — **confirmed**. The `record_status` (draft/in_review/active/retired, the authoring/approval state) and `lifecycle_stage` (trial/live/retired, the processing's maturity) split defined in §3 is the agreed model, resolving the plan's overlapping single `status` field.
 - **APD determination** — **[spec clarification]** the appropriate-policy-document requirement is read from the chosen **Schedule 1 condition** (§7.4), not the Art 9 point; (h)/(i)/(j) need a Schedule 1 condition but no APD. Rule 2 and §7.3 reflect this.
 - **DUAA commencement watch**: keep the transfer test, ADM, children's and complaints provisions under review as ICO guidance is finalised (Plan §1.4). Verify the Schedule 1/8 vocabularies against the latest *revised* legislation for any DUAA amendments before seeding.
+- **Phase 1.7 spike outcomes** — **applied in v0.4**: the spike (`spike-findings.md`) validated the dual mapping and the profile-conditioned rule engine, and this version adopts its two clarifications — the `regime_scope` discriminator on the Lawful Basis Record (§6.1) and the unified `general`/`law_enforcement` regime enum on the Regime Policy (§2.2). Carried forward for the build: version capture must be enforced at the persistence layer (rule 17 is "always", not caller-optional).
 
 ---
 
-*Derived from Plan v0.12 (`ROPA-tool-plan.md`). This spec is v0.1 and will iterate alongside it.*
+*Derived from Plan v0.12 (`ROPA-tool-plan.md`). This spec is v0.4 and will iterate alongside it.*

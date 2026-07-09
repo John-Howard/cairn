@@ -2,7 +2,7 @@
 
 **Status:** Project Plan v0.1 — high-level roadmap for iteration. Detailed planning (resourcing, durations, costs) is deferred to future engagements.
 **System:** *Cairn* — a single-tenant, configurable Record of Processing Activities (ROPA) and accountability tool; the Fire and Rescue Service (FRS) is the first sector profile.
-**Derives from:** *ROPA Tool — High-Level Plan & Data Architecture* (**Plan v0.12**, `ROPA-tool-plan.md`) and *ROPA Tool — Field-Level Build Specification* (**Spec v0.3**, `ROPA-tool-field-spec.md`).
+**Derives from:** *ROPA Tool — High-Level Plan & Data Architecture* (**Plan v0.12**, `ROPA-tool-plan.md`) and *ROPA Tool — Field-Level Build Specification* (**Spec v0.4**, `ROPA-tool-field-spec.md`).
 
 ---
 
@@ -11,7 +11,7 @@
 - **Outcome-based phases.** Each phase produces something usable or decision-ready; phases overlap where sensible. Durations and resourcing are intentionally out of scope here (§11).
 - **Build the configurable core, ship the FRS first.** Per Plan, Cairn is one configurable codebase; v1 populates a single sector pack (FRS) so a working register ships without waiting for an abstract platform.
 - **Single-tenant.** Each organisation runs its own instance — no multi-tenant isolation problem to engineer (Plan, *Configuration & deployment model*).
-- **Design is largely done.** Phases 0–2 build directly on the completed architecture (Plan v0.12) and field spec (Spec v0.3), so the project starts from a strong, low-ambiguity base.
+- **Design is largely done.** Phases 0–2 build directly on the completed architecture (Plan v0.12) and field spec (Spec v0.4), so the project starts from a strong, low-ambiguity base.
 
 ---
 
@@ -171,4 +171,4 @@ Flagged now, to resolve when we go into detail:
 
 ---
 
-*Project Plan v0.1. Derives from Plan v0.12 and Spec v0.3; will iterate as detailed planning proceeds.*
+*Project Plan v0.1. Derives from Plan v0.12 and Spec v0.4; will iterate as detailed planning proceeds.*

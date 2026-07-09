@@ -25,4 +25,4 @@
 
 ## Verdict
 
-Both load-bearing mechanisms are sound as designed. No changes to Plan v0.12 required; two field-level `[spec clarification]` candidates for Spec v0.3 (items 1–2 above). Phase 1.2 can proceed on this shape, and the spike code is a usable kernel for sub-phase 2a.
+Both load-bearing mechanisms are sound as designed. No changes to Plan v0.12 required; two field-level `[spec clarification]` candidates (items 1–2 above) were **applied in Spec v0.4** (§6.1 and §2.2). Phase 1.2 can proceed on this shape, and the spike code is a usable kernel for sub-phase 2a.

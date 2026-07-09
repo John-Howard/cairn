@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-**Cairn** is a system for managing a **Record of Processing Activities (ROPA)** that meets UK ICO / UK GDPR Article 30 requirements. The repository is currently **design-stage only** — there is no application code, build system, or tests yet. Three documents define what will be built and how:
+**Cairn** is a system for managing a **Record of Processing Activities (ROPA)** that meets UK ICO / UK GDPR Article 30 requirements. The repository holds the design baseline plus the **Phase 1.7 architecture spike** (`src/cairn/`, validated in `docs/spike-findings.md`) — a working prototype of the regime dual mapping and profile-conditioned rule engine, usable as the kernel for sub-phase 2a. Three documents define what will be built and how:
 
 - `docs/Cairn-project-plan.md` — **Project Plan v0.1**. The delivery roadmap: outcome-based phases 0–6 (design → architecture → build → test → migrate/pilot → go-live → operate) and cross-cutting workstreams. The "how and when". Roadmap-level only — resourcing, durations and costs are deferred.
 - `docs/ROPA-tool-plan.md` — **Plan v0.12**. High-level data architecture, legal basis, and design decisions. The "why".
-- `docs/ROPA-tool-field-spec.md` — **Spec v0.3**. Concrete, buildable field-level specification derived from the plan. The "what to build". Section references (e.g. "Plan §3.2") point back into the plan.
+- `docs/ROPA-tool-field-spec.md` — **Spec v0.4**. Concrete, buildable field-level specification derived from the plan. The "what to build". Section references (e.g. "Plan §3.2") point back into the plan.
 
 When starting implementation, treat the field spec as authoritative for entities, fields, types, and validation rules; consult the plan for the reasoning behind a decision; consult the project plan for phase sequencing and scope-of-phase. The spec tags any field-level decision that refines the plan with `[spec clarification]` — these never contradict the plan.
 

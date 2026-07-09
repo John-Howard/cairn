@@ -102,3 +102,4 @@ dmypy.json
 
 # Personal Claude Code overrides (per migration-guide step 3)
 .claude/local.md
+.claude/settings.local.md

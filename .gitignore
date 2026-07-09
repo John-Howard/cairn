@@ -1,0 +1,104 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media/
+/staticfiles/
+local_settings.py
+
+# Environment variables
+.env
+.env.staging
+.env.*.backup
+
+# Staging secrets
+secrets/
+
+# IDEs
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignore all of .idea folder by default
+.idea/*
+
+# Allow some project-specific settings
+!.idea/codeStyles/
+!.idea/deployment.xml
+!.idea/modules.xml
+!.idea/vcs.xml
+!.idea/workspace.xml
+
+# Ignore user-specific or OS-specific settings
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/libraries
+.idea/assetWizardSettings.xml
+.idea/jsLibraryMappings.xml
+.idea/shelf
+
+# Ignore IDE caches
+.idea/dataSources/
+.idea/dataSources.ids
+.idea/dataSources.local.xml
+.idea/sqlDataSources.xml
+.idea/dynamic.xml
+.idea/uiDesigner.xml
+.idea/httpRequests
+.idea/inspectionProfiles
+.idea/runConfigurations/
+
+# Testing
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Geojson
+*.geojson
+
+# Personal Claude Code overrides (per migration-guide step 3)
+.claude/local.md

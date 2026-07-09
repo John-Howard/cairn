@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-**Cairn** is a system for managing a **Record of Processing Activities (ROPA)** that meets UK ICO / UK GDPR Article 30 requirements. The repository holds the design baseline plus the **Phase 1.7 architecture spike** (`src/cairn/`, validated in `docs/spike-findings.md`) — a working prototype of the regime dual mapping and profile-conditioned rule engine, usable as the kernel for sub-phase 2a. Three documents define what will be built and how:
+**Cairn** is a system for managing a **Record of Processing Activities (ROPA)** that meets UK ICO / UK GDPR Article 30 requirements. The repository holds the design baseline plus the **Phase 1.2 physical data model** (`src/cairn/models/`, grown from the Phase 1.7 spike validated in `docs/spike-findings.md`): the full Spec §3–§7 schema with all junctions, ORM-enforced versioning (`src/cairn/versioning.py`), and draft seed vocabularies (`src/cairn/seeds/` — legal §7.1–7.6 and FRS pack §7.10–7.14, pending legislation verification per Spec §11). SQLite + `create_all` for now; Alembic deferred until the hosting decision. Three documents define what will be built and how:
 
 - `docs/Cairn-project-plan.md` — **Project Plan v0.1**. The delivery roadmap: outcome-based phases 0–6 (design → architecture → build → test → migrate/pilot → go-live → operate) and cross-cutting workstreams. The "how and when". Roadmap-level only — resourcing, durations and costs are deferred.
 - `docs/ROPA-tool-plan.md` — **Plan v0.12**. High-level data architecture, legal basis, and design decisions. The "why".

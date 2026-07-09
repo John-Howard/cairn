@@ -314,7 +314,7 @@ Each is a managed controlled vocabulary. Common shape: `id`, `label`, plus the a
 
 ### 7.4 Schedule 1 Condition (DPA 2018) — full vocabulary
 
-Paragraphs 1–37 are the selectable conditions; paras 38–41 are the APD/safeguards mechanics (§7.4.4). `APD` = appropriate policy document required. Verify against the latest revised legislation for any DUAA amendments before seeding.
+Paragraphs 1–4 and 6–37 are the selectable conditions (36 in total); para 5 (the Part 2 APD requirement) and paras 38–41 are the APD/safeguards mechanics (§7.4.4), not selectable conditions. **[spec clarification]** `APD` = appropriate policy document required. Verify against the latest revised legislation for any DUAA amendments before seeding.
 
 **7.4.1 Part 1 — employment, health and research** *(satisfies the "basis in law" requirement for Art 9(2)(b),(h),(i),(j))*
 

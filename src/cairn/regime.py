@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cairn.audit import capture_version, record_event
+from cairn.audit import record_event
 from cairn.models import (
     ACTIVE_SCOPE,
     ActivityDomain,
@@ -50,8 +50,8 @@ def set_regime_policy(
             new_value={"assigned_regime": regime},
         )
     elif policy.assigned_regime != regime:
-        capture_version(session, policy, changed_by=actor, change_note=reason)
         old = policy.assigned_regime
+        policy.change_note = reason
         policy.assigned_regime = regime
         policy.rationale = reason
         record_event(
@@ -100,8 +100,8 @@ def _change_regime(
     reason: str,
     actor: User,
 ) -> None:
-    capture_version(session, activity, changed_by=actor, change_note=reason)
     old = activity.regime
+    activity.change_note = reason
     activity.regime = regime
     record_event(
         session,

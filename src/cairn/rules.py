@@ -65,10 +65,10 @@ TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
 def _sensitive_condition(activity: ProcessingActivity) -> str | None:
     basis = active_basis(activity)
     if activity.regime == Regime.GENERAL:
-        if basis is None or not basis.art9_condition:
+        if basis is None or not basis.art9_condition_id:
             return "Special-category data requires an Art 9 condition on the active basis record"
         return None
-    if basis is None or not basis.schedule8_condition or not basis.apd_ref:
+    if basis is None or not basis.schedule8_condition_id or not basis.apd_id:
         return "LE sensitive processing requires a Schedule 8 condition and an s42 APD reference"
     return None
 
@@ -82,10 +82,10 @@ def _art10_present(activity: ProcessingActivity) -> str | None:
 
 def _flag_f_ea(activity: ProcessingActivity) -> str | None:
     basis = active_basis(activity)
-    if basis is not None and basis.art6_basis in ("f", "ea"):
+    if basis is not None and basis.art6_basis is not None and basis.art6_basis.code in ("f", "ea"):
         return (
-            f"Basis ({basis.art6_basis}) on a statutory task — public task (e) is the natural "
-            "basis; flag for DPO review"
+            f"Basis ({basis.art6_basis.code}) on a statutory task — public task (e) is the "
+            "natural basis; flag for DPO review"
         )
     return None
 
@@ -99,10 +99,10 @@ def _linked_external_source(activity: ProcessingActivity) -> str | None:
 def _active_regime_basis(activity: ProcessingActivity) -> str | None:
     basis = active_basis(activity)
     if activity.regime == Regime.LAW_ENFORCEMENT:
-        if basis is None or not basis.s35_basis:
+        if basis is None or not basis.s35_basis_id:
             return "Law-enforcement regime requires an s35 basis on the active (Part 3) record"
         return None
-    if basis is None or not basis.art6_basis:
+    if basis is None or not basis.art6_basis_id:
         return "General regime requires an Art 6 basis on the active (Part 2) record"
     return None
 

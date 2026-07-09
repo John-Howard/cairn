@@ -10,18 +10,21 @@ from cairn.models import (
     SourceSpecialCategory,
 )
 from cairn.rules import Severity, evaluate
+from conftest import art6, business_function
 
 
-def make_statutory_activity(session, actor, art6_basis):
+def make_statutory_activity(session, actor, art6_code):
     activity = ProcessingActivity(
         name="Community Safety Programme",
+        business_function_id=business_function(session, "Prevention & Community Safety").id,
         purpose="Deliver community fire-safety engagement.",
+        personal_data_source=["from_data_subject"],
         is_statutory_task=True,
         owner_id=actor.id,
         next_review_at=date(2026, 12, 1),
     )
     activity.basis_records.append(
-        LawfulBasisRecord(regime_scope=RegimeScope.PART2, art6_basis=art6_basis)
+        LawfulBasisRecord(regime_scope=RegimeScope.PART2, art6_basis=art6(session, art6_code))
     )
     session.add(activity)
     session.flush()
@@ -31,7 +34,7 @@ def make_statutory_activity(session, actor, art6_basis):
 def test_public_authority_guard_fires_only_for_guarded_public_profile(
     session, frs_profile, private_profile, actor
 ):
-    activity = make_statutory_activity(session, actor, art6_basis="f")
+    activity = make_statutory_activity(session, actor, art6_code="f")
 
     public_findings = evaluate(activity, frs_profile)
     assert [f.rule_id for f in public_findings] == ["4"]
@@ -41,12 +44,12 @@ def test_public_authority_guard_fires_only_for_guarded_public_profile(
 
 
 def test_public_authority_guard_silent_on_public_task_basis(session, frs_profile, actor):
-    activity = make_statutory_activity(session, actor, art6_basis="e")
+    activity = make_statutory_activity(session, actor, art6_code="e")
     assert evaluate(activity, frs_profile) == []
 
 
 def test_external_data_rule_gated_by_module(session, frs_profile, private_profile, actor):
-    activity = make_statutory_activity(session, actor, art6_basis="e")
+    activity = make_statutory_activity(session, actor, art6_code="e")
     activity.external_data_use_mode = ExternalDataUseMode.MANUAL
     session.flush()
 

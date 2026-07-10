@@ -30,6 +30,9 @@ env/
 *.log
 db.sqlite3
 db.sqlite3-journal
+cairn.db
+*.db
+*.db-journal
 /media/
 /staticfiles/
 local_settings.py

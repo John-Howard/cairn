@@ -1,9 +1,12 @@
 from datetime import date
 
 import pytest
+from fastapi import Request
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
+from cairn.db import get_session
 from cairn.models import (
     ActivityDomain,
     APDScope,
@@ -27,6 +30,7 @@ from cairn.models import (
 )
 from cairn.regime import set_regime_policy
 from cairn.seeds import seed_frs_pack, seed_legal
+from cairn.web import create_app
 
 
 @pytest.fixture
@@ -168,3 +172,81 @@ def enforcement_activity(session, actor, criminal_category):
     session.add(activity)
     session.flush()
     return activity
+
+
+def _sqlite_engine(db_path):
+    engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+
+    @event.listens_for(engine, "connect")
+    def enable_fks(dbapi_connection, connection_record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
+    return engine
+
+
+def _wire_app(engine):
+    app = create_app()
+    session_factory = sessionmaker(bind=engine)
+
+    def override_get_session(request: Request):
+        db = session_factory()
+        db.info["actor_id"] = request.session.get("user_id")
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override_get_session
+    return app
+
+
+@pytest.fixture
+def web_engine(tmp_path):
+    engine = _sqlite_engine(tmp_path / "web.db")
+    Base.metadata.create_all(engine)
+    return engine
+
+
+@pytest.fixture
+def web_app(web_engine):
+    return _wire_app(web_engine)
+
+
+@pytest.fixture
+def client(web_app):
+    return TestClient(web_app, follow_redirects=False)
+
+
+@pytest.fixture
+def seeded_web_engine(tmp_path):
+    engine = _sqlite_engine(tmp_path / "seeded.db")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        profile = OrganisationProfile(
+            org_name="Seeded Fire & Rescue Service",
+            org_type=OrgType.PUBLIC_AUTHORITY,
+            applicable_regimes=[Regime.GENERAL],
+            active_modules=["complaints"],
+            public_authority_guards=True,
+        )
+        db.add(profile)
+        db.flush()
+        seed_legal(db)
+        seed_frs_pack(db)
+        db.add_all(
+            [
+                User(display_name="Ada Approver", role=Role.APPROVER_DPO),
+                User(display_name="Vic Viewer", role=Role.VIEWER),
+            ]
+        )
+        db.commit()
+    return engine
+
+
+@pytest.fixture
+def seeded_client(seeded_web_engine):
+    return TestClient(_wire_app(seeded_web_engine), follow_redirects=False)

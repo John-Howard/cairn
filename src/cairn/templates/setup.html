@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "macros.html" import text_input, radios, checkboxes, checkbox, select %}
+{% block title %}Set up Cairn{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Set up Cairn</h1>
+<form method="post" action="/setup">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {{ text_input("org_name", "Organisation name") }}
+
+  {{ radios("org_type", "Organisation type", org_type_options) }}
+
+  {{ select("sector_pack", "Sector pack", [("frs", "Fire & Rescue Service")], selected="frs") }}
+  <p class="govuk-hint">Only the FRS pack is available in v1.</p>
+
+  {{ radios("legal_entity_topology", "Legal entity topology", topology_options, checked="single") }}
+
+  {{ checkboxes("applicable_regimes", "Applicable regimes", regime_options, checked=["general"], disabled=["general"]) }}
+
+  {{ checkboxes("active_modules", "Active modules", module_options, checked=["complaints"], disabled=["complaints"]) }}
+
+  {{ checkbox("public_authority_guards", "Enable public-authority guards (rule 4)", checked=true) }}
+
+  <h2 class="govuk-heading-m">Bootstrap user</h2>
+  {{ text_input("display_name", "Your name") }}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">Complete setup</button>
+</form>
+{% endblock %}

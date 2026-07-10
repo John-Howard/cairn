@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from cairn.audit import record_event
 from cairn.auth import current_user, get_csrf_token, verify_csrf
+from cairn.basis import basis_detail_context
 from cairn.db import get_session
 from cairn.export import export_views
 from cairn.models import (
@@ -21,6 +22,7 @@ from cairn.models import (
     ExternalDataSource,
     ExternalDataUseMode,
     LEClassification,
+    LegalEntity,
     LifecycleStage,
     LineageGranularity,
     OrganisationProfile,
@@ -142,6 +144,7 @@ SIMPLE_JUNCTIONS: dict[str, SimpleJunction] = {
     "recipients": SimpleJunction("recipients", Recipient, "recipient"),
     "systems": SimpleJunction("systems", SystemAsset, "system"),
     "data-sources": SimpleJunction("data_sources", ExternalDataSource, "external data source"),
+    "controllers": SimpleJunction("controllers", LegalEntity, "controller (legal entity)"),
 }
 
 SECTION_TITLES = {
@@ -149,6 +152,7 @@ SECTION_TITLES = {
     "recipients": "Recipients",
     "systems": "Systems",
     "data-sources": "External data sources",
+    "controllers": "Controllers",
 }
 
 JUNCTION_CONTEXT_KEYS = {
@@ -156,6 +160,7 @@ JUNCTION_CONTEXT_KEYS = {
     "recipients": ("recipients", "recipient_options"),
     "systems": ("systems", "system_options"),
     "data-sources": ("data_sources", "data_source_options"),
+    "controllers": ("controllers", "controller_options"),
 }
 
 
@@ -415,6 +420,7 @@ def _junction_context(session: Session, activity: ProcessingActivity) -> dict:
     linked_recipient_ids = {r.id for r in activity.recipients}
     linked_system_ids = {s.id for s in activity.systems}
     linked_source_ids = {s.id for s in activity.data_sources}
+    linked_controller_ids = {c.id for c in activity.controllers}
     linked_category_ids = {link.category_id for link in activity.data_category_links}
     subject_labels = {
         s.id: _display_label(s) for s in session.scalars(select(DataSubjectCategory)).all()
@@ -430,6 +436,8 @@ def _junction_context(session: Session, activity: ProcessingActivity) -> dict:
         "system_options": _available_options(session, SystemAsset, linked_system_ids),
         "data_sources": [(s.id, _display_label(s)) for s in activity.data_sources],
         "data_source_options": _available_options(session, ExternalDataSource, linked_source_ids),
+        "controllers": [(c.id, _display_label(c)) for c in activity.controllers],
+        "controller_options": _available_options(session, LegalEntity, linked_controller_ids),
         "data_category_rows": [
             {
                 "link_id": link.id,
@@ -497,6 +505,7 @@ def _render_detail(
         "error": error,
         **_findings_context(activity, profile),
         **_junction_context(session, activity),
+        **basis_detail_context(session, activity, user),
     }
     return templates.TemplateResponse(
         request, "activities/detail.html", context, status_code=status_code

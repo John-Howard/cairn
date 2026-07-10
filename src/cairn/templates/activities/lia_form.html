@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, select, textarea, date_input %}
+{% block title %}{{ "Edit" if is_edit else "Add" }} LIA/RLI record{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit" if is_edit else "Add" }} LIA/RLI record</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="/activities/{{ activity.id }}/basis/part2/lia/{{ (lia_id ~ '/edit') if is_edit else 'new' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {{ textarea("interest_identified", "Interest identified", values.interest_identified, error=error_map.get("interest_identified")) }}
+  {{ textarea("necessity_test", "Necessity test", values.necessity_test, error=error_map.get("necessity_test")) }}
+  {{ textarea("balancing_test", "Balancing test", values.balancing_test, hint="Required for (f) legitimate interests; not required for (ea) recognised legitimate interests") }}
+  {{ textarea("safeguards", "Safeguards", values.safeguards) }}
+  {{ select("decision", "Decision", decision_options, selected=values.decision) }}
+  {% if error_map.get("decision") %}<p class="govuk-error-message">{{ error_map.get("decision") }}</p>{% endif %}
+  {{ date_input("decision_date", "Decision date", values.decision_date, error=error_map.get("decision_date")) }}
+
+  {% if is_edit %}
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+  {% endif %}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+</form>
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}">Back to activity</a></p>
+{% endblock %}

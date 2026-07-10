@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import error_summary, text_input, select, checkbox, textarea %}
+{% from "macros.html" import error_summary, text_input, select, checkbox, textarea, date_input %}
 {% block title %}{{ ("Edit " if is_edit else "Add ") ~ spec.display_name | lower }}{% endblock %}
 {% block content %}
 <h1 class="govuk-heading-l">{{ "Edit" if is_edit else "Add" }} {{ spec.display_name | lower }}</h1>
@@ -17,6 +17,8 @@
     {% elif field.kind in ("enum", "fk") %}
       {{ select(field.name, field.label, field.options, selected=field.value) }}
       {% if field.error %}<p class="govuk-error-message">{{ field.error }}</p>{% endif %}
+    {% elif field.kind == "date" %}
+      {{ date_input(field.name, field.label, field.value, error=field.error) }}
     {% else %}
       {{ text_input(field.name, field.label, field.value, error=field.error) }}
     {% endif %}

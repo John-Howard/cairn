@@ -1,0 +1,26 @@
+<div id="findings-panel"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <h2 class="govuk-heading-m">Findings</h2>
+  {% if not findings %}
+  <p class="govuk-body">No findings.</p>
+  {% endif %}
+  {% for finding in findings %}
+    {% if finding.severity.value == "block" %}
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+      <div role="alert">
+        <h3 class="govuk-error-summary__title">
+          <strong class="govuk-tag govuk-tag--red">Blocking</strong> Rule {{ finding.rule_id }}
+        </h3>
+        <div class="govuk-error-summary__body">{{ finding.message }}</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="govuk-warning-text">
+      <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+      <strong class="govuk-warning-text__text">
+        <span class="govuk-visually-hidden">Warning</span>
+        Rule {{ finding.rule_id }}: {{ finding.message }}
+      </strong>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>

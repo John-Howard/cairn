@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "macros.html" import select %}
+{% block title %}Processing activities{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Processing activities</h1>
+  </div>
+  <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+    <a class="govuk-button" data-module="govuk-button" href="/activities/new">Add activity</a>
+  </div>
+</div>
+
+<form method="get" action="/activities" class="govuk-!-margin-bottom-6">
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-one-third">
+      {{ select("business_function", "Business function", [("", "All")] + business_function_options, selected=filters.business_function) }}
+    </div>
+    <div class="govuk-grid-column-one-third">
+      {{ select("record_status", "Record status", [("", "All")] + record_status_options, selected=filters.record_status) }}
+    </div>
+    <div class="govuk-grid-column-one-third">
+      {{ select("regime", "Regime", [("", "All")] + regime_options, selected=filters.regime) }}
+    </div>
+  </div>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Apply filters</button>
+</form>
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Name</th>
+      <th scope="col" class="govuk-table__header">Business function</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+      <th scope="col" class="govuk-table__header">Regime</th>
+      <th scope="col" class="govuk-table__header">Export view</th>
+      <th scope="col" class="govuk-table__header">Next review</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/activities/{{ row.activity.id }}">{{ row.activity.name }}</a></td>
+      <td class="govuk-table__cell">{{ row.business_function_label }}</td>
+      <td class="govuk-table__cell"><strong class="govuk-tag">{{ record_status_labels[row.activity.record_status] }}</strong></td>
+      <td class="govuk-table__cell"><strong class="govuk-tag govuk-tag--purple">{{ regime_labels[row.activity.regime] }}</strong></td>
+      <td class="govuk-table__cell">
+        {% for view in row.export_views %}<strong class="govuk-tag govuk-tag--turquoise">{{ view }}</strong>{% endfor %}
+      </td>
+      <td class="govuk-table__cell">{{ row.activity.next_review_at }}</td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell" colspan="6">No processing activities match these filters.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

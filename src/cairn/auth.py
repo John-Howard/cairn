@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from cairn.db import get_session
 from cairn.models import Role, User
+from cairn.settings import get_settings
 from cairn.templating import templates
 
 CSRF_SESSION_KEY = "csrf_token"
@@ -52,8 +53,14 @@ def require_role(*roles: Role):
 router = APIRouter()
 
 
+def _require_dev_mode() -> None:
+    if get_settings().auth_mode != "dev":
+        raise HTTPException(status_code=404)
+
+
 @router.get("/login")
 def login_form(request: Request, session: Session = Depends(get_session)):
+    _require_dev_mode()
     users = session.scalars(select(User).order_by(User.display_name)).all()
     user_options = [(user.id, f"{user.display_name} — {user.role.value}") for user in users]
     return templates.TemplateResponse(
@@ -70,10 +77,12 @@ def login_submit(
     csrf_token: str = Form(...),
     session: Session = Depends(get_session),
 ):
+    _require_dev_mode()
     verify_csrf(request, csrf_token)
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=400, detail="Unknown user")
+    request.session.clear()
     request.session["user_id"] = user.id
     return RedirectResponse("/", status_code=302)
 

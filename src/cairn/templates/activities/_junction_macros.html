@@ -1,0 +1,81 @@
+{% macro simple_junction_section(kind, section_title, items, options, activity_id, csrf_token) %}
+<div id="{{ kind }}-section">
+  <h3 class="govuk-heading-s">{{ section_title }}</h3>
+  <table class="govuk-table">
+    <tbody class="govuk-table__body">
+      {% for item_id, label in items %}
+      <tr class="govuk-table__row">
+        <td class="govuk-table__cell">{{ label }}</td>
+        <td class="govuk-table__cell">
+          <form method="post" action="/activities/{{ activity_id }}/{{ kind }}/{{ item_id }}/remove" hx-post="/activities/{{ activity_id }}/{{ kind }}/{{ item_id }}/remove" hx-target="#{{ kind }}-section" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="2">None linked.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if options %}
+  <form method="post" action="/activities/{{ activity_id }}/{{ kind }}" hx-post="/activities/{{ activity_id }}/{{ kind }}" hx-target="#{{ kind }}-section" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <select class="govuk-select" name="item_id">
+      {% for value, text in options %}
+      <option value="{{ value }}">{{ text }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add</button>
+  </form>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro data_categories_section(rows, category_options, scope_options, activity_id, csrf_token) %}
+<div id="data-categories-section">
+  <h3 class="govuk-heading-s">Data categories</h3>
+  <table class="govuk-table">
+    <thead class="govuk-table__head">
+      <tr class="govuk-table__row">
+        <th scope="col" class="govuk-table__header">Category</th>
+        <th scope="col" class="govuk-table__header">Data subject scope</th>
+        <th scope="col" class="govuk-table__header"></th>
+      </tr>
+    </thead>
+    <tbody class="govuk-table__body">
+      {% for row in rows %}
+      <tr class="govuk-table__row">
+        <td class="govuk-table__cell">{{ row.category_label }}</td>
+        <td class="govuk-table__cell">{{ row.scope_label or "All" }}</td>
+        <td class="govuk-table__cell">
+          <form method="post" action="/activities/{{ activity_id }}/data-categories/{{ row.link_id }}/remove" hx-post="/activities/{{ activity_id }}/data-categories/{{ row.link_id }}/remove" hx-target="#data-categories-section" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="3">None linked.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if category_options %}
+  <form method="post" action="/activities/{{ activity_id }}/data-categories" hx-post="/activities/{{ activity_id }}/data-categories" hx-target="#data-categories-section" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <select class="govuk-select" name="category_id">
+      {% for value, text in category_options %}
+      <option value="{{ value }}">{{ text }}</option>
+      {% endfor %}
+    </select>
+    <select class="govuk-select" name="data_subject_scope_id">
+      <option value="">All linked data subjects</option>
+      {% for value, text in scope_options %}
+      <option value="{{ value }}">{{ text }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add</button>
+  </form>
+  {% endif %}
+</div>
+{% endmacro %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, text_input, select, radios, checkboxes, checkbox, textarea, date_input %}
+{% block title %}{{ "Edit activity" if is_edit else "Add activity" }}{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit activity" if is_edit else "Add activity" }}</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="{{ ('/activities/' ~ activity.id) if is_edit else '/activities' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {% if is_edit %}
+  <p class="govuk-body">
+    Regime: <strong class="govuk-tag govuk-tag--purple">{{ regime_labels[activity.regime] }}</strong>
+    (source: {{ activity.regime_source.value }})
+  </p>
+  {% endif %}
+
+  {{ text_input("name", "Name", values.name, error=error_map.get("name")) }}
+  {{ text_input("reference", "Reference", values.reference) }}
+  {{ select("business_function_id", "Business function", business_function_options, selected=values.business_function_id) }}
+  {{ textarea("description", "Description", values.description) }}
+  {{ select("activity_type", "Activity type", activity_type_options, selected=values.activity_type) }}
+  {{ select("activity_domain", "Activity domain", activity_domain_options, selected=values.activity_domain) }}
+  {{ select("controller_or_processor", "Controller or processor", controller_or_processor_options, selected=values.controller_or_processor) }}
+  {{ select("lifecycle_stage", "Lifecycle stage", lifecycle_stage_options, selected=values.lifecycle_stage) }}
+  {{ date_input("trial_start", "Trial start", values.trial_start, error=error_map.get("trial_start")) }}
+  {{ date_input("trial_end", "Trial end", values.trial_end, error=error_map.get("trial_end")) }}
+  {{ textarea("purpose", "Purpose", values.purpose, error=error_map.get("purpose")) }}
+  {{ textarea("categories_of_processing", "Categories of processing", values.categories_of_processing, hint="Required when controller or processor is processor", error=error_map.get("categories_of_processing")) }}
+  {{ checkboxes("personal_data_source", "Personal data source", personal_data_source_options, checked=values.personal_data_source) }}
+  {% if error_map.get("personal_data_source") %}<p class="govuk-error-message">{{ error_map.get("personal_data_source") }}</p>{% endif %}
+  {{ checkbox("is_statutory_task", "This is a statutory task", checked=values.is_statutory_task) }}
+  {{ checkbox("vulnerable_or_safeguarding_flag", "Involves vulnerable persons or safeguarding", checked=values.vulnerable_or_safeguarding_flag) }}
+  {{ checkbox("children_flag", "Involves children", checked=values.children_flag) }}
+  {{ select("external_data_use_mode", "External data use mode", external_data_use_mode_options, selected=values.external_data_use_mode) }}
+  {{ select("lineage_granularity", "Lineage granularity", lineage_granularity_options, selected=values.lineage_granularity) }}
+  {{ checkbox("high_risk_flag", "High risk", checked=values.high_risk_flag) }}
+  {{ select("owner_id", "Owner", user_options, selected=values.owner_id) }}
+  {{ date_input("last_reviewed_at", "Last reviewed", values.last_reviewed_at, error=error_map.get("last_reviewed_at")) }}
+  {{ date_input("next_review_at", "Next review", values.next_review_at, error=error_map.get("next_review_at")) }}
+
+  {% if is_law_enforcement %}
+  <h2 class="govuk-heading-m">Law enforcement (Part 3) fields</h2>
+  {{ checkboxes("le_data_subject_classification", "Data subject classification (s38)", le_classification_options, checked=values.le_data_subject_classification) }}
+  {% if error_map.get("le_data_subject_classification") %}<p class="govuk-error-message">{{ error_map.get("le_data_subject_classification") }}</p>{% endif %}
+  {{ checkbox("le_fact_vs_assessment_noted", "Fact vs assessment distinction noted (s38)", checked=values.le_fact_vs_assessment_noted) }}
+  {{ textarea("s62_logging_note", "s62 logging note", values.s62_logging_note) }}
+  {% endif %}
+
+  {% if is_edit %}
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+  {% endif %}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">{{ "Save changes" if is_edit else "Create activity" }}</button>
+</form>
+{% endblock %}

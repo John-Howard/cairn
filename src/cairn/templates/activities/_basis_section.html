@@ -1,0 +1,97 @@
+{% from "activities/_basis_macros.html" import basis_summary %}
+<h2 class="govuk-heading-m">Lawful basis</h2>
+
+<h3 class="govuk-heading-s">Active mapping ({{ regime_scope_labels[active_scope] }})</h3>
+{% if active_basis_view %}
+{{ basis_summary(active_basis_view) }}
+{% else %}
+<p class="govuk-body">No active lawful basis mapping recorded yet.</p>
+{% endif %}
+{% if can_author_basis %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/basis/{{ active_scope }}/edit">{{ "Edit" if active_basis_view else "Add" }} active mapping</a></p>
+{% endif %}
+
+{% if inactive_basis_view %}
+<details class="govuk-details" data-module="govuk-details">
+  <summary class="govuk-details__summary">
+    <span class="govuk-details__summary-text">Retained — not the live mapping ({{ regime_scope_labels[inactive_basis_view.scope] }})</span>
+  </summary>
+  <div class="govuk-details__text">
+    {{ basis_summary(inactive_basis_view) }}
+    {% if can_author_basis %}
+    <p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/basis/{{ inactive_basis_view.scope }}/edit">Edit retained mapping</a></p>
+    {% endif %}
+  </div>
+</details>
+{% elif can_author_basis %}
+{% set dormant_scope = "part3" if active_scope == "part2" else "part2" %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/basis/{{ dormant_scope }}/edit">Add dormant {{ regime_scope_labels[dormant_scope] }} mapping</a></p>
+{% endif %}
+
+{% if show_consents %}
+<h3 class="govuk-heading-s">Consent records</h3>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Consented to</th>
+      <th scope="col" class="govuk-table__header">Method</th>
+      <th scope="col" class="govuk-table__header">Date/time</th>
+      <th scope="col" class="govuk-table__header">Withdrawal</th>
+      <th scope="col" class="govuk-table__header">Age check</th>
+      <th scope="col" class="govuk-table__header"></th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for consent in consent_records %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ consent.consented_to }}</td>
+      <td class="govuk-table__cell">{{ consent_method_labels[consent.consent_method] }}</td>
+      <td class="govuk-table__cell">{{ consent.consent_datetime }}</td>
+      <td class="govuk-table__cell">{{ withdrawal_status_labels[consent.withdrawal_status] }}</td>
+      <td class="govuk-table__cell">{{ age_check_outcome_labels.get(consent.age_check_outcome, "") }}</td>
+      <td class="govuk-table__cell">
+        {% if can_author_basis %}<a class="govuk-link" href="/activities/{{ activity.id }}/basis/part2/consents/{{ consent.id }}/edit">Edit</a>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="6">No consent records.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_author_basis %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/basis/part2/consents/new">Add consent record</a></p>
+{% endif %}
+{% endif %}
+
+{% if show_lia %}
+<h3 class="govuk-heading-s">LIA / RLI records</h3>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Interest identified</th>
+      <th scope="col" class="govuk-table__header">Balancing test</th>
+      <th scope="col" class="govuk-table__header">Decision</th>
+      <th scope="col" class="govuk-table__header">Decision date</th>
+      <th scope="col" class="govuk-table__header"></th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for lia in lia_records %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ lia.interest_identified }}</td>
+      <td class="govuk-table__cell">{{ "Yes" if lia.balancing_test else "No" }}</td>
+      <td class="govuk-table__cell">{{ lia_decision_labels[lia.decision] }}</td>
+      <td class="govuk-table__cell">{{ lia.decision_date }}</td>
+      <td class="govuk-table__cell">
+        {% if can_author_basis %}<a class="govuk-link" href="/activities/{{ activity.id }}/basis/part2/lia/{{ lia.id }}/edit">Edit</a>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="5">No LIA/RLI records.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_author_basis %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/basis/part2/lia/new">Add LIA/RLI record</a></p>
+{% endif %}
+{% endif %}

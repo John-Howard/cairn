@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, text_input, select, textarea %}
+{% block title %}{{ "Edit" if basis else "Add" }} lawful basis ({{ scope }}){% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit" if basis else "Add" }} lawful basis — {{ scope }}</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="/activities/{{ activity.id }}/basis/{{ scope }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {% if scope == "part2" %}
+  {{ select("art6_basis_id", "Art 6 basis", art6_options, selected=values.art6_basis_id, hint=("Public task (e) is the natural basis for a statutory task; legitimate interests ((f)/(ea)) will be flagged for DPO review." if guard_hint else None)) }}
+  {% if error_map.get("art6_basis_id") %}<p class="govuk-error-message">{{ error_map.get("art6_basis_id") }}</p>{% endif %}
+
+  {{ textarea("art6_justification", "Art 6 justification", values.art6_justification) }}
+
+  {% if show_art9 %}
+  {{ select("art9_condition_id", "Art 9 condition", art9_options, selected=values.art9_condition_id, hint="Required for special-category data.") }}
+  {% if error_map.get("art9_condition_id") %}<p class="govuk-error-message">{{ error_map.get("art9_condition_id") }}</p>{% endif %}
+  {% endif %}
+
+  {{ select("schedule1_condition_id", "Schedule 1 condition", schedule1_options, selected=values.schedule1_condition_id) }}
+  {% if error_map.get("schedule1_condition_id") %}<p class="govuk-error-message">{{ error_map.get("schedule1_condition_id") }}</p>{% endif %}
+
+  {% if show_art10 %}
+  {{ text_input("art10_basis", "Art 10 basis", values.art10_basis, hint="Required for criminal-offence data.") }}
+  {% endif %}
+
+  {{ select("apd_id", "Appropriate Policy Document", apd_options, selected=values.apd_id) }}
+  {% if error_map.get("apd_id") %}<p class="govuk-error-message">{{ error_map.get("apd_id") }}</p>{% endif %}
+
+  {% else %}
+  {{ select("s35_basis_id", "s35 basis", s35_options, selected=values.s35_basis_id) }}
+  {% if error_map.get("s35_basis_id") %}<p class="govuk-error-message">{{ error_map.get("s35_basis_id") }}</p>{% endif %}
+
+  {{ select("schedule8_condition_id", "Schedule 8 condition", schedule8_options, selected=values.schedule8_condition_id) }}
+  {% if error_map.get("schedule8_condition_id") %}<p class="govuk-error-message">{{ error_map.get("schedule8_condition_id") }}</p>{% endif %}
+
+  {{ select("apd_id", "Appropriate Policy Document", apd_options, selected=values.apd_id) }}
+  {% if error_map.get("apd_id") %}<p class="govuk-error-message">{{ error_map.get("apd_id") }}</p>{% endif %}
+  {% endif %}
+
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+</form>
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}">Back to activity</a></p>
+{% endblock %}

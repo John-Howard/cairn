@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -9,6 +10,8 @@ from cairn.auth import current_user, get_csrf_token, verify_csrf
 from cairn.db import get_session
 from cairn.models import (
     AdequacyStatus,
+    APDScope,
+    AppropriatePolicyDocument,
     BusinessFunction,
     DataSubjectCategory,
     ExternalDataSource,
@@ -283,6 +286,18 @@ VOCABULARIES: dict[str, VocabSpec] = {
                 VocabField("label", "Label", "text"),
             ],
         ),
+        VocabSpec(
+            key="appropriate-policy-documents",
+            model=AppropriatePolicyDocument,
+            display_name="Appropriate Policy Document",
+            label_attr="title",
+            fields=[
+                VocabField("title", "Title", "text", required=True),
+                VocabField("scope", "Scope", "enum", required=True, enum_cls=APDScope),
+                VocabField("document_ref", "Document reference", "text", required=True),
+                VocabField("retain_until", "Retain until", "date", required=True),
+            ],
+        ),
     ]
 }
 
@@ -320,6 +335,14 @@ def _fk_maps(session: Session, spec: VocabSpec) -> dict[str, dict[str, str]]:
     return maps
 
 
+def _valid_date(value: str) -> bool:
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
 def _format_value(entry, f: VocabField, fk_maps: dict[str, dict[str, str]]):
     raw = getattr(entry, f.name)
     if f.kind == "bool":
@@ -328,6 +351,8 @@ def _format_value(entry, f: VocabField, fk_maps: dict[str, dict[str, str]]):
         return _enum_option_label(raw) if raw is not None else ""
     if f.kind == "fk":
         return fk_maps.get(f.name, {}).get(raw, "") if raw else ""
+    if f.kind == "date":
+        return raw.isoformat() if raw else ""
     return raw if raw is not None else ""
 
 
@@ -351,6 +376,8 @@ def _entity_to_values(entity, spec: VocabSpec) -> dict:
             values[f.name] = bool(raw)
         elif f.kind == "enum":
             values[f.name] = raw.value if raw is not None else ""
+        elif f.kind == "date":
+            values[f.name] = raw.isoformat() if raw else ""
         else:
             values[f.name] = raw if raw is not None else ""
     return values
@@ -386,6 +413,12 @@ def _validate_vocab(session: Session, spec: VocabSpec, values: dict) -> list[dic
                     errors.append({"field": f.name, "message": "Select a valid option"})
         elif f.kind == "fk" and value and session.get(f.fk_model, value) is None:
             errors.append({"field": f.name, "message": f"Select a valid {f.label.lower()}"})
+        elif f.kind == "date":
+            if not value:
+                if f.required:
+                    errors.append({"field": f.name, "message": f"Enter {f.label.lower()}"})
+            elif not _valid_date(value):
+                errors.append({"field": f.name, "message": "Enter a valid date"})
     return errors
 
 
@@ -398,6 +431,8 @@ def _apply_vocab_values(entity, spec: VocabSpec, values: dict) -> None:
             setattr(entity, f.name, f.enum_cls(value) if value else None)
         elif f.kind == "fk":
             setattr(entity, f.name, value or None)
+        elif f.kind == "date":
+            setattr(entity, f.name, date.fromisoformat(value) if value else None)
         else:
             setattr(entity, f.name, value if (f.required or value) else None)
 

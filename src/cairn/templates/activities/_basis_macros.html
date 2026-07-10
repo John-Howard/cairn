@@ -1,0 +1,39 @@
+{% macro basis_summary(view) %}
+<dl class="govuk-summary-list">
+  {% if view.scope == "part2" %}
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Art 6 basis</dt>
+    <dd class="govuk-summary-list__value">{{ view.art6 }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Art 6 justification</dt>
+    <dd class="govuk-summary-list__value">{{ view.art6_justification }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Art 9 condition</dt>
+    <dd class="govuk-summary-list__value">{{ view.art9 }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Schedule 1 condition</dt>
+    <dd class="govuk-summary-list__value">{{ view.schedule1 }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Art 10 basis</dt>
+    <dd class="govuk-summary-list__value">{{ view.art10 }}</dd>
+  </div>
+  {% else %}
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">s35 basis</dt>
+    <dd class="govuk-summary-list__value">{{ view.s35 }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Schedule 8 condition</dt>
+    <dd class="govuk-summary-list__value">{{ view.schedule8 }}</dd>
+  </div>
+  {% endif %}
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Appropriate Policy Document</dt>
+    <dd class="govuk-summary-list__value">{{ view.apd }}</dd>
+  </div>
+</dl>
+{% endmacro %}

@@ -1,0 +1,88 @@
+{% macro error_summary(errors) %}
+{% if errors %}
+<div class="govuk-error-summary" data-module="govuk-error-summary">
+  <div role="alert">
+    <h2 class="govuk-error-summary__title">There is a problem</h2>
+    <div class="govuk-error-summary__body">
+      <ul class="govuk-list govuk-error-summary__list">
+        {% for error in errors %}
+        <li><a href="#{{ error.field }}">{{ error.message }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro text_input(name, label, value="", hint=None, error=None) %}
+<div class="govuk-form-group{{ ' govuk-form-group--error' if error else '' }}">
+  <label class="govuk-label" for="{{ name }}">{{ label }}</label>
+  {% if hint %}<div class="govuk-hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+  {% if error %}<p class="govuk-error-message" id="{{ name }}-error"><span class="govuk-visually-hidden">Error:</span> {{ error }}</p>{% endif %}
+  <input class="govuk-input{{ ' govuk-input--error' if error else '' }}" id="{{ name }}" name="{{ name }}" type="text" value="{{ value }}">
+</div>
+{% endmacro %}
+
+{% macro select(name, label, options, selected=None, hint=None) %}
+<div class="govuk-form-group">
+  <label class="govuk-label" for="{{ name }}">{{ label }}</label>
+  {% if hint %}<div class="govuk-hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+  <select class="govuk-select" id="{{ name }}" name="{{ name }}">
+    {% for value, text in options %}
+    <option value="{{ value }}"{{ ' selected' if value == selected else '' }}>{{ text }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endmacro %}
+
+{% macro radios(name, legend, options, checked=None, hint=None) %}
+<div class="govuk-form-group">
+  <fieldset class="govuk-fieldset">
+    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">{{ legend }}</legend>
+    {% if hint %}<div class="govuk-hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+    <div class="govuk-radios" data-module="govuk-radios">
+      {% for value, text in options %}
+      <div class="govuk-radios__item">
+        <input class="govuk-radios__input" id="{{ name }}-{{ value }}" name="{{ name }}" type="radio" value="{{ value }}"{{ ' checked' if value == checked else '' }}>
+        <label class="govuk-label govuk-radios__label" for="{{ name }}-{{ value }}">{{ text }}</label>
+      </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+</div>
+{% endmacro %}
+
+{% macro checkboxes(name, legend, options, checked=[], disabled=[], hint=None) %}
+<div class="govuk-form-group">
+  <fieldset class="govuk-fieldset">
+    <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">{{ legend }}</legend>
+    {% if hint %}<div class="govuk-hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+    <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+      {% for value, text in options %}
+      <div class="govuk-checkboxes__item">
+        <input class="govuk-checkboxes__input" id="{{ name }}-{{ value }}" name="{{ name }}" type="checkbox" value="{{ value }}"
+          {{ 'checked' if value in checked else '' }}
+          {{ 'disabled' if value in disabled else '' }}>
+        <label class="govuk-label govuk-checkboxes__label" for="{{ name }}-{{ value }}">{{ text }}</label>
+      </div>
+      {% if value in disabled %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+      {% endif %}
+      {% endfor %}
+    </div>
+  </fieldset>
+</div>
+{% endmacro %}
+
+{% macro checkbox(name, label, checked=False, hint=None) %}
+<div class="govuk-form-group">
+  <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+    <div class="govuk-checkboxes__item">
+      <input class="govuk-checkboxes__input" id="{{ name }}" name="{{ name }}" type="checkbox" value="true"{{ ' checked' if checked else '' }}>
+      <label class="govuk-label govuk-checkboxes__label" for="{{ name }}">{{ label }}</label>
+      {% if hint %}<div class="govuk-hint">{{ hint }}</div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}

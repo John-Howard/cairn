@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "macros.html" import radios %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Sign in</h1>
+<form method="post" action="/login">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {{ radios("user_id", "Select a user", user_options) }}
+  <button type="submit" class="govuk-button" data-module="govuk-button">Sign in</button>
+</form>
+{% endblock %}

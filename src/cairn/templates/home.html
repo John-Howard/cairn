@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ profile.org_name }}</h1>
+<p class="govuk-body">Signed in as {{ user.display_name }} ({{ user.role.value }}).</p>
+{% endblock %}

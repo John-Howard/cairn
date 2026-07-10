@@ -148,9 +148,16 @@ def _flag_f_ea(activity: ProcessingActivity) -> str | None:
     return None
 
 
-def _linked_external_source(activity: ProcessingActivity) -> str | None:
+def _external_data_requirements(activity: ProcessingActivity) -> str | None:
     if not activity.data_sources:
         return "External data use requires at least one linked External Data Source"
+    if not any(notice.covers_art14 for notice in activity.privacy_notices):
+        return "External data requires a linked privacy notice covering Art 14"
+    if (
+        activity.external_data_use_mode == ExternalDataUseMode.AUTOMATED
+        and not activity.adm_records
+    ):
+        return "Automated external-data use requires a Decision-support/ADM record"
     return None
 
 
@@ -267,7 +274,7 @@ REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "active_sensitive_condition": _sensitive_condition,
     "art10_basis_present": _art10_present,
     "flag_f_ea_for_dpo": _flag_f_ea,
-    "linked_external_source": _linked_external_source,
+    "external_data_requirements": _external_data_requirements,
     "active_regime_basis_set": _active_regime_basis,
     "schedule1_and_apd_present": _schedule1_and_apd_present,
     "lia_balancing_test_present": _lia_balancing_test_present,
@@ -337,10 +344,11 @@ RULES: list[Rule] = [
     ),
     Rule(
         id="8",
-        description="External data use requires a linked External Data Source",
+        description="External data use requires sources, an Art 14 notice, and an ADM record "
+        "when automated",
         severity=Severity.BLOCK,
         trigger="uses_external_data",
-        requirement="linked_external_source",
+        requirement="external_data_requirements",
         applicability=Applicability(required_module="external_data"),
     ),
     Rule(

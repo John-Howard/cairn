@@ -1,0 +1,40 @@
+<h2 class="govuk-heading-m">Security measures</h2>
+<table class="govuk-table">
+  <tbody class="govuk-table__body">
+    {% for row in security_inherited_rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.measure_label }}</td>
+      <td class="govuk-table__cell"><strong class="govuk-tag">Inherited from systems</strong></td>
+      <td class="govuk-table__cell"></td>
+    </tr>
+    {% endfor %}
+    {% for row in security_manual_rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.measure_label }}</td>
+      <td class="govuk-table__cell"></td>
+      <td class="govuk-table__cell">
+        {% if can_author_registers %}
+        <form method="post" action="/activities/{{ activity.id }}/security/{{ row.link_id }}/remove">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% if not security_inherited_rows and not security_manual_rows %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="3">No security measures linked.</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+{% if can_author_registers and security_measure_options %}
+<form method="post" action="/activities/{{ activity.id }}/security">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <select class="govuk-select" name="security_measure_id">
+    {% for value, text in security_measure_options %}
+    <option value="{{ value }}">{{ text }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add security measure</button>
+</form>
+{% endif %}

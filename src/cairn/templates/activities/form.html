@@ -23,7 +23,8 @@
   {{ select("activity_type", "Activity type", activity_type_options, selected=values.activity_type) }}
   {{ select("activity_domain", "Activity domain", activity_domain_options, selected=values.activity_domain) }}
   {{ select("controller_or_processor", "Controller or processor", controller_or_processor_options, selected=values.controller_or_processor) }}
-  {{ select("lifecycle_stage", "Lifecycle stage", lifecycle_stage_options, selected=values.lifecycle_stage) }}
+  {{ select("lifecycle_stage", "Lifecycle stage", lifecycle_stage_options, selected=values.lifecycle_stage, hint=("Only the DPO/approver may move a trial to live." if trial_hint else None)) }}
+  {% if error_map.get("lifecycle_stage") %}<p class="govuk-error-message" id="lifecycle_stage-error">{{ error_map.get("lifecycle_stage") }}</p>{% endif %}
   {{ date_input("trial_start", "Trial start", values.trial_start, error=error_map.get("trial_start")) }}
   {{ date_input("trial_end", "Trial end", values.trial_end, error=error_map.get("trial_end")) }}
   {{ textarea("purpose", "Purpose", values.purpose, error=error_map.get("purpose")) }}

@@ -11,6 +11,7 @@ from cairn.models import (
     ExternalDataUseMode,
     LifecycleStage,
     LineageGranularity,
+    PrivacyNotice,
     ProcessingActivity,
     Recipient,
     RecipientType,
@@ -280,3 +281,27 @@ def test_rule14_clears_with_both(session, actor, frs_profile):
     )
     make_dpia(session, activity)
     assert _rule_finding(evaluate(activity, frs_profile), "14") is None
+
+
+def test_rule8_automated_requires_adm_record(session, actor, frs_profile):
+    activity = make_activity(
+        session, actor, external_data_use_mode=ExternalDataUseMode.AUTOMATED
+    )
+    activity.data_sources.append(ExternalDataSource(name="Acorn"))
+    activity.privacy_notices.append(
+        PrivacyNotice(
+            notice_version="1.0",
+            publish_date=date(2026, 1, 1),
+            covers_art13=False,
+            covers_art14=True,
+        )
+    )
+    session.flush()
+
+    findings = [f for f in evaluate(activity, frs_profile) if f.rule_id == "8"]
+    assert len(findings) == 1
+    assert "Decision-support/ADM record" in findings[0].message
+
+    activity.adm_records.append(DecisionSupportADM(use_mode=ADMUseMode.AUTOMATED))
+    session.flush()
+    assert [f for f in evaluate(activity, frs_profile) if f.rule_id == "8"] == []

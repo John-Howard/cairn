@@ -1,0 +1,43 @@
+{% if show_feeds_editor %}
+<h2 class="govuk-heading-m">Feeds (consumer activities)</h2>
+<table class="govuk-table">
+  <tbody class="govuk-table__body">
+    {% for row in feed_rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.consumer_label }}</td>
+      <td class="govuk-table__cell">
+        {% if can_author_registers %}
+        <form method="post" action="/activities/{{ activity.id }}/feeds/{{ row.feed_id }}/remove">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="2">No feeds linked.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_author_registers and consumer_options %}
+<form method="post" action="/activities/{{ activity.id }}/feeds">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <select class="govuk-select" name="consumer_activity_id">
+    {% for value, text in consumer_options %}
+    <option value="{{ value }}">{{ text }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add feed</button>
+</form>
+{% endif %}
+{% endif %}
+{% if show_fed_by %}
+<h2 class="govuk-heading-m">Fed by</h2>
+<ul class="govuk-list govuk-list--bullet">
+  {% for label in fed_by_rows %}
+  <li>{{ label }}</li>
+  {% else %}
+  <li>Not fed by any analytics activity.</li>
+  {% endfor %}
+</ul>
+{% endif %}

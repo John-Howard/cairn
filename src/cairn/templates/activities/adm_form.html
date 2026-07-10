@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, select, textarea, checkbox, checkboxes %}
+{% block title %}{{ "Edit" if is_edit else "Add" }} ADM record{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit" if is_edit else "Add" }} decision-support / ADM record</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="/activities/{{ activity.id }}/adm/{{ (adm_id ~ '/edit') if is_edit else 'new' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {{ select("use_mode", "Use mode", use_mode_options, selected=values.use_mode) }}
+  {{ checkboxes("data_sources", "Data sources", data_source_options, checked=values.data_sources) }}
+  {% if error_map.get("data_sources") %}<p class="govuk-error-message">{{ error_map.get("data_sources") }}</p>{% endif %}
+  {{ textarea("technique", "Technique", values.technique) }}
+  {{ checkbox("solely_automated", "Solely automated (Art 22A-22D trigger)", checked=values.solely_automated) }}
+  {{ checkbox("significant_effects", "Significant effects", checked=values.significant_effects) }}
+  {{ textarea("accuracy_bias_checks", "Accuracy / bias checks", values.accuracy_bias_checks) }}
+  {{ textarea("human_review", "Human review", values.human_review) }}
+  {{ textarea("contestability", "Contestability", values.contestability) }}
+  {{ select("transparency_ref", "Transparency reference (privacy notice)", transparency_ref_options, selected=values.transparency_ref) }}
+  {% if error_map.get("transparency_ref") %}<p class="govuk-error-message">{{ error_map.get("transparency_ref") }}</p>{% endif %}
+
+  {% if is_edit %}
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+  {% endif %}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+</form>
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}">Back to activity</a></p>
+{% endblock %}

@@ -22,6 +22,7 @@ from cairn.models import (
     LegalEntityRoleType,
     LineageGranularity,
     PersonalDataCategory,
+    PrivacyNotice,
     ProcessingActivity,
     RecordStatus,
     RegimeScope,
@@ -109,6 +110,14 @@ def test_hfsv_risk_model_feeds_operational_targeting(session, actor, frs_profile
         owner_id=actor.id,
         next_review_at=date(2026, 12, 1),
         data_sources=[eds_acorn, eds_adultcare],
+    )
+    model.privacy_notices.append(
+        PrivacyNotice(
+            notice_version="1.0",
+            publish_date=date(2026, 1, 1),
+            covers_art13=False,
+            covers_art14=True,
+        )
     )
     session.add_all([operational, model])
     session.flush()

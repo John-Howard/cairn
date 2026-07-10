@@ -1,0 +1,47 @@
+<h2 class="govuk-heading-m">Contracts / DSAs</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Type</th>
+      <th scope="col" class="govuk-table__header">Start</th>
+      <th scope="col" class="govuk-table__header">Review</th>
+      <th scope="col" class="govuk-table__header">Expiry</th>
+      <th scope="col" class="govuk-table__header"></th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for contract in contracts %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ contract_type_labels[contract.type] }}</td>
+      <td class="govuk-table__cell">{{ contract.start_date }}</td>
+      <td class="govuk-table__cell">{{ contract.review_date }}</td>
+      <td class="govuk-table__cell">{{ contract.expiry_date or "" }}</td>
+      <td class="govuk-table__cell">
+        {% if can_author_registers %}
+        <a class="govuk-link" href="/activities/{{ activity.id }}/contracts/{{ contract.id }}/edit">Edit</a>
+        <form method="post" action="/activities/{{ activity.id }}/contracts/{{ contract.id }}/unlink" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Unlink</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="5">No contracts linked.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_author_registers %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/contracts/new">Create and link a new contract</a></p>
+{% if contract_link_options %}
+<form method="post" action="/activities/{{ activity.id }}/contracts/link">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <select class="govuk-select" name="contract_id">
+    {% for value, text in contract_link_options %}
+    <option value="{{ value }}">{{ text }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Link existing contract</button>
+</form>
+{% endif %}
+{% endif %}

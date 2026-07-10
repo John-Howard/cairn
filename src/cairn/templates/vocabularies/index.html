@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Vocabularies{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Vocabularies</h1>
+<p class="govuk-body">Reference and lookup vocabularies. Statutory legal vocabularies are read-only and change via seed or migration only.</p>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Vocabulary</th>
+      <th scope="col" class="govuk-table__header">Entries</th>
+      <th scope="col" class="govuk-table__header">Editing</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/vocabularies/{{ row.key }}">{{ row.display_name }}</a></td>
+      <td class="govuk-table__cell">{{ row.count }}</td>
+      <td class="govuk-table__cell">
+        {% if row.editable %}
+        <strong class="govuk-tag govuk-tag--green">Editable</strong>
+        {% else %}
+        <strong class="govuk-tag govuk-tag--grey">Read-only</strong>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

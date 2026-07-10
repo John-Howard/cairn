@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, text_input, select, checkbox, textarea %}
+{% block title %}{{ ("Edit " if is_edit else "Add ") ~ spec.display_name | lower }}{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit" if is_edit else "Add" }} {{ spec.display_name | lower }}</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="{{ ('/vocabularies/' ~ spec.key ~ '/' ~ entry_id) if is_edit else ('/vocabularies/' ~ spec.key) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {% for field in field_rows %}
+    {% if field.kind == "bool" %}
+      {{ checkbox(field.name, field.label, checked=field.value) }}
+    {% elif field.kind == "textarea" %}
+      {{ textarea(field.name, field.label, field.value, error=field.error) }}
+    {% elif field.kind in ("enum", "fk") %}
+      {{ select(field.name, field.label, field.options, selected=field.value) }}
+      {% if field.error %}<p class="govuk-error-message">{{ field.error }}</p>{% endif %}
+    {% else %}
+      {{ text_input(field.name, field.label, field.value, error=field.error) }}
+    {% endif %}
+  {% endfor %}
+
+  {% if is_edit %}
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+  {% endif %}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">{{ "Save changes" if is_edit else "Create entry" }}</button>
+</form>
+<p class="govuk-body"><a class="govuk-link" href="/vocabularies/{{ spec.key }}">Back to {{ spec.display_name | lower }}</a></p>
+{% endblock %}

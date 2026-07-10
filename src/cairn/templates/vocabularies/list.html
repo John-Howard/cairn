@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ spec.display_name }}{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">{{ spec.display_name }}</h1>
+  </div>
+  {% if can_edit %}
+  <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+    <a class="govuk-button" data-module="govuk-button" href="/vocabularies/{{ spec.key }}/new">Add entry</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if not spec.editable %}
+<p class="govuk-body"><strong class="govuk-tag govuk-tag--grey">Read-only</strong> This statutory vocabulary changes via seed or migration only.</p>
+{% endif %}
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      {% for column in columns %}
+      <th scope="col" class="govuk-table__header">{{ column }}</th>
+      {% endfor %}
+      {% if can_edit %}<th scope="col" class="govuk-table__header">Actions</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      {% for value in row.cells %}
+      <td class="govuk-table__cell">{{ value }}</td>
+      {% endfor %}
+      {% if can_edit %}
+      <td class="govuk-table__cell"><a class="govuk-link" href="/vocabularies/{{ spec.key }}/{{ row.id }}/edit">Edit</a></td>
+      {% endif %}
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell" colspan="{{ columns | length + (1 if can_edit else 0) }}">No entries.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="govuk-body"><a class="govuk-link" href="/vocabularies">Back to vocabularies</a></p>
+{% endblock %}

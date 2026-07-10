@@ -1,21 +1,19 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 import cairn
 from cairn.activities import router as activities_router
-from cairn.auth import LoginRequired, current_user, get_csrf_token
+from cairn.auth import LoginRequired
 from cairn.auth import router as auth_router
-from cairn.db import get_session
-from cairn.models import OrganisationProfile, User
+from cairn.dashboard import router as dashboard_router
+from cairn.regime_policy import router as regime_policy_router
 from cairn.settings import get_settings
 from cairn.setup import router as setup_router
-from cairn.templating import templates
+from cairn.vocabularies import router as vocabularies_router
 
 STATIC_DIR = Path(__file__).parent / "static"
 GOVUK_ASSETS_DIR = STATIC_DIR / "govuk" / "assets"
@@ -59,20 +57,10 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(setup_router)
+    app.include_router(dashboard_router)
+    app.include_router(vocabularies_router)
+    app.include_router(regime_policy_router)
     app.include_router(activities_router)
-
-    @app.get("/")
-    def home(
-        request: Request,
-        user: User = Depends(current_user),
-        session: Session = Depends(get_session),
-    ):
-        profile = session.scalars(select(OrganisationProfile)).first()
-        return templates.TemplateResponse(
-            request,
-            "home.html",
-            {"user": user, "profile": profile, "csrf_token": get_csrf_token(request)},
-        )
 
     return app
 

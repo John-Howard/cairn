@@ -63,6 +63,12 @@ class LawfulBasisRecord(AuditedBase):
     s35_basis: Mapped[LawfulBasisLE | None] = relationship()
     schedule8_condition: Mapped[Schedule8Condition | None] = relationship()
     apd: Mapped[AppropriatePolicyDocument | None] = relationship()
+    consent_records: Mapped[list[ConsentRecord]] = relationship(
+        back_populates="lawful_basis_record"
+    )
+    lia_rli_records: Mapped[list[LIARLIRecord]] = relationship(
+        back_populates="lawful_basis_record"
+    )
 
 
 class ConsentRecord(AuditedBase):
@@ -79,6 +85,10 @@ class ConsentRecord(AuditedBase):
     age_check_outcome: Mapped[AgeCheckOutcome | None]
     parental_consent_captured: Mapped[bool | None]
 
+    lawful_basis_record: Mapped[LawfulBasisRecord] = relationship(
+        back_populates="consent_records"
+    )
+
 
 class LIARLIRecord(AuditedBase):
     __tablename__ = "lia_rli_record"
@@ -90,6 +100,10 @@ class LIARLIRecord(AuditedBase):
     safeguards: Mapped[str | None] = mapped_column(Text)
     decision: Mapped[LIADecision]
     decision_date: Mapped[date]
+
+    lawful_basis_record: Mapped[LawfulBasisRecord] = relationship(
+        back_populates="lia_rli_records"
+    )
 
 
 class Transfer(AuditedBase):

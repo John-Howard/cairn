@@ -10,6 +10,9 @@ from cairn.models import (
     ActivityType,
     ADMUseMode,
     APDScope,
+    ContractDSA,
+    ContractType,
+    ControllerOrProcessor,
     DataSubjectCategory,
     DecisionSupportADM,
     ExternalDataSource,
@@ -178,3 +181,51 @@ def test_hfsv_risk_model_feeds_operational_targeting(session, actor, frs_profile
     assert evaluate(operational, frs_profile) == []
     assert export_views(model, frs_profile) == {"art30_1"}
     assert export_views(operational, frs_profile) == {"art30_1"}
+
+
+def test_control_room_processor_activity_rule13(session, actor, frs_profile):
+    """Spec §9.3 — Activity C: FRS as processor for a neighbouring fire authority."""
+    neighbour = LegalEntity(
+        label="Neighbouring Fire Authority", role_type=LegalEntityRoleType.PARTNER_AGENCY
+    )
+    session.add(neighbour)
+    session.flush()
+
+    control = business_function(session, "Control / Mobilising")
+    activity = ProcessingActivity(
+        name="Regional Control & Mobilising Service (for Neighbouring Fire Authority)",
+        business_function_id=control.id,
+        activity_type=ActivityType.OPERATIONAL,
+        controller_or_processor=ControllerOrProcessor.PROCESSOR,
+        record_status=RecordStatus.ACTIVE,
+        purpose="Receive emergency calls and mobilise resources on behalf of the controlling "
+        "authority.",
+        personal_data_source=["from_data_subject", "from_third_party"],
+        owner_id=actor.id,
+        next_review_at=date(2026, 11, 1),
+    )
+    session.add(activity)
+    session.flush()
+
+    findings = evaluate(activity, frs_profile)
+    assert "13" in [f.rule_id for f in findings]
+
+    activity.categories_of_processing = (
+        "Call handling, incident logging, resource mobilising and retention carried out "
+        "on the controller's documented instructions."
+    )
+    activity.controllers.append(neighbour)
+    activity.contracts.append(
+        ContractDSA(
+            type=ContractType.CONTROLLER_PROCESSOR,
+            art28_checklist_complete=True,
+            start_date=date(2026, 4, 1),
+            review_date=date(2027, 4, 1),
+            parties=[neighbour],
+        )
+    )
+    session.flush()
+
+    findings = evaluate(activity, frs_profile)
+    assert "13" not in [f.rule_id for f in findings]
+    assert export_views(activity, frs_profile) == {"art30_2"}

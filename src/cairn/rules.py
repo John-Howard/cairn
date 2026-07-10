@@ -3,15 +3,19 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from cairn.models import (
+    ActivityType,
     AgeCheckOutcome,
     ContractType,
     ControllerOrProcessor,
     ExternalDataUseMode,
+    LifecycleStage,
+    LineageGranularity,
     OrganisationProfile,
     OrgType,
     ProcessingActivity,
     Regime,
     RegimeScope,
+    SourceSpecialCategory,
 )
 from cairn.regime import active_basis
 
@@ -90,6 +94,14 @@ def _not_controller(activity: ProcessingActivity) -> bool:
     return activity.controller_or_processor != ControllerOrProcessor.CONTROLLER
 
 
+def _external_data_source_special_category(activity: ProcessingActivity) -> bool:
+    return any(
+        source.special_category
+        in (SourceSpecialCategory.INFERRED, SourceSpecialCategory.DIRECT)
+        for source in activity.data_sources
+    )
+
+
 TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
     "always": lambda a: True,
     "has_special_category_data": lambda a: a.special_category_flag,
@@ -100,6 +112,11 @@ TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
     "active_basis_art6_f": _active_basis_art6_f,
     "active_basis_art6_a": _active_basis_art6_a,
     "not_controller": _not_controller,
+    "vulnerable_or_children": lambda a: a.vulnerable_or_safeguarding_flag or a.children_flag,
+    "external_data_source_special_category": _external_data_source_special_category,
+    "is_analytics_modelling": lambda a: a.activity_type == ActivityType.ANALYTICS_MODELLING,
+    "has_transfers": lambda a: bool(a.transfers),
+    "is_trial": lambda a: a.lifecycle_stage == LifecycleStage.TRIAL,
 }
 
 
@@ -198,6 +215,54 @@ def _processor_or_joint_arrangement_present(activity: ProcessingActivity) -> str
     return None
 
 
+def _dpia_screening_present(activity: ProcessingActivity) -> str | None:
+    if not activity.dpias:
+        return "Safeguarding/children processing requires DPIA screening"
+    return None
+
+
+def _external_data_dpia_present(activity: ProcessingActivity) -> str | None:
+    if not activity.dpias:
+        return "External data that is or infers special-category data requires DPIA screening"
+    return None
+
+
+def _analytics_modelling_requirements(activity: ProcessingActivity) -> str | None:
+    if not activity.feeds:
+        return "Analytics/modelling activities must feed at least one operational activity"
+    if not activity.dpias:
+        return "Analytics/modelling activities require a DPIA"
+    if activity.external_data_use_mode == ExternalDataUseMode.AUTOMATED and any(
+        record.significant_effects for record in activity.adm_records
+    ):
+        if activity.lineage_granularity != LineageGranularity.RECORD:
+            return "Automated modelling with significant effects requires record-level lineage"
+    return None
+
+
+APPROPRIATE_SAFEGUARDS_MECHANISMS = {"idta", "addendum", "bcr"}
+
+
+def _transfer_safeguards_test_present(activity: ProcessingActivity) -> str | None:
+    for transfer in activity.transfers:
+        if (
+            transfer.mechanism is not None
+            and transfer.mechanism.code in APPROPRIATE_SAFEGUARDS_MECHANISMS
+            and not transfer.data_protection_test
+        ):
+            return (
+                "Appropriate-safeguards transfers require the s85 'not materially lower' "
+                "data protection test"
+            )
+    return None
+
+
+def _trial_requirements(activity: ProcessingActivity) -> str | None:
+    if activity.trial_end is None or not activity.dpias:
+        return "Trial activities require a DPIA and a trial end date"
+    return None
+
+
 REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "active_sensitive_condition": _sensitive_condition,
     "art10_basis_present": _art10_present,
@@ -208,6 +273,11 @@ REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "lia_balancing_test_present": _lia_balancing_test_present,
     "consent_requirements_met": _consent_requirements_met,
     "processor_or_joint_arrangement_present": _processor_or_joint_arrangement_present,
+    "dpia_screening_present": _dpia_screening_present,
+    "external_data_dpia_present": _external_data_dpia_present,
+    "analytics_modelling_requirements": _analytics_modelling_requirements,
+    "transfer_safeguards_test_present": _transfer_safeguards_test_present,
+    "trial_requirements": _trial_requirements,
 }
 
 
@@ -259,12 +329,42 @@ RULES: list[Rule] = [
         requirement="consent_requirements_met",
     ),
     Rule(
+        id="7",
+        description="Safeguarding/children processing needs DPIA screening",
+        severity=Severity.BLOCK,
+        trigger="vulnerable_or_children",
+        requirement="dpia_screening_present",
+    ),
+    Rule(
         id="8",
         description="External data use requires a linked External Data Source",
         severity=Severity.BLOCK,
         trigger="uses_external_data",
         requirement="linked_external_source",
         applicability=Applicability(required_module="external_data"),
+    ),
+    Rule(
+        id="9",
+        description="External data that is or infers special-category data needs DPIA screening",
+        severity=Severity.BLOCK,
+        trigger="external_data_source_special_category",
+        requirement="external_data_dpia_present",
+        applicability=Applicability(required_module="external_data"),
+    ),
+    Rule(
+        id="10",
+        description="Analytics/modelling activities need a feeds link, a DPIA, and record "
+        "lineage when automated with significant effects",
+        severity=Severity.BLOCK,
+        trigger="is_analytics_modelling",
+        requirement="analytics_modelling_requirements",
+    ),
+    Rule(
+        id="11",
+        description="Appropriate-safeguards transfers need the s85 data protection test",
+        severity=Severity.BLOCK,
+        trigger="has_transfers",
+        requirement="transfer_safeguards_test_present",
     ),
     Rule(
         id="12",
@@ -279,6 +379,13 @@ RULES: list[Rule] = [
         severity=Severity.BLOCK,
         trigger="not_controller",
         requirement="processor_or_joint_arrangement_present",
+    ),
+    Rule(
+        id="14",
+        description="Trial activities need a DPIA and a trial end date",
+        severity=Severity.BLOCK,
+        trigger="is_trial",
+        requirement="trial_requirements",
     ),
 ]
 

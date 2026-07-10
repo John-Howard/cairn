@@ -2,7 +2,14 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from cairn.models import LifecycleStage, ProcessingActivity, RecordStatus, Regime
+from cairn.models import (
+    DPIA,
+    LifecycleStage,
+    ProcessingActivity,
+    RecordStatus,
+    Regime,
+    ScreeningOutcome,
+)
 from test_activities import _business_function_id, _login, _user_id
 
 
@@ -15,6 +22,18 @@ def _seed_dashboard_activities(engine) -> None:
     today = date.today()
     with Session(engine) as db:
         db.info["actor_id"] = approver_id
+        trial_activity = ProcessingActivity(
+            name="Trial Ending Activity",
+            business_function_id=prevention_id,
+            purpose="Purpose",
+            personal_data_source=["from_data_subject"],
+            owner_id=approver_id,
+            next_review_at=today + timedelta(days=200),
+            record_status=RecordStatus.DRAFT,
+            lifecycle_stage=LifecycleStage.TRIAL,
+            trial_start=today - timedelta(days=30),
+            trial_end=today + timedelta(days=30),
+        )
         db.add_all(
             [
                 ProcessingActivity(
@@ -26,18 +45,7 @@ def _seed_dashboard_activities(engine) -> None:
                     next_review_at=today - timedelta(days=10),
                     record_status=RecordStatus.ACTIVE,
                 ),
-                ProcessingActivity(
-                    name="Trial Ending Activity",
-                    business_function_id=prevention_id,
-                    purpose="Purpose",
-                    personal_data_source=["from_data_subject"],
-                    owner_id=approver_id,
-                    next_review_at=today + timedelta(days=200),
-                    record_status=RecordStatus.DRAFT,
-                    lifecycle_stage=LifecycleStage.TRIAL,
-                    trial_start=today - timedelta(days=30),
-                    trial_end=today + timedelta(days=30),
-                ),
+                trial_activity,
                 ProcessingActivity(
                     name="LE Register Activity",
                     business_function_id=protection_id,
@@ -58,6 +66,13 @@ def _seed_dashboard_activities(engine) -> None:
                     record_status=RecordStatus.RETIRED,
                 ),
             ]
+        )
+        db.flush()
+        db.add(
+            DPIA(
+                activity_id=trial_activity.id,
+                screening_outcome=ScreeningOutcome.REQUIRED,
+            )
         )
         db.commit()
 

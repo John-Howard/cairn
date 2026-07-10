@@ -9,7 +9,6 @@ from cairn.models import (
     PersonalDataCategory,
     ProcessingActivity,
     RegimeScope,
-    SourceSpecialCategory,
 )
 from cairn.rules import Severity, evaluate
 from conftest import art6, business_function
@@ -72,9 +71,7 @@ def test_external_data_rule_gated_by_module(session, frs_profile, private_profil
 
     assert evaluate(activity, private_profile) == []
 
-    activity.data_sources.append(
-        ExternalDataSource(name="CACI Acorn", special_category=SourceSpecialCategory.INFERRED)
-    )
+    activity.data_sources.append(ExternalDataSource(name="CACI Acorn"))
     session.flush()
     assert evaluate(activity, frs_profile) == []
 

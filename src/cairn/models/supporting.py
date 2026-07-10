@@ -27,6 +27,7 @@ from cairn.models.vocab import (
     Schedule1Condition,
     Schedule8Condition,
     SpecialCategoryCondition,
+    TransferMechanism,
 )
 
 
@@ -115,6 +116,9 @@ class Transfer(AuditedBase):
     mechanism_id: Mapped[str] = mapped_column(ForeignKey("transfer_mechanism.id"))
     data_protection_test: Mapped[str | None] = mapped_column(Text)
 
+    activity: Mapped[ProcessingActivity] = relationship(back_populates="transfers")
+    mechanism: Mapped[TransferMechanism] = relationship()
+
 
 class DPIA(AuditedBase):
     __tablename__ = "dpia"
@@ -129,6 +133,8 @@ class DPIA(AuditedBase):
     dpo_advice: Mapped[str | None] = mapped_column(Text)
     sign_off_by: Mapped[str | None] = mapped_column(ForeignKey("user.id"))
     review_date: Mapped[date | None]
+
+    activity: Mapped[ProcessingActivity] = relationship(back_populates="dpias")
 
 
 contract_party = Table(

@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
 from cairn.models import (
+    DPIA,
     AgeCheckOutcome,
     APDScope,
     ConsentMethod,
@@ -15,6 +16,7 @@ from cairn.models import (
     LIARLIRecord,
     ProcessingActivity,
     RegimeScope,
+    ScreeningOutcome,
 )
 from cairn.rules import Severity, evaluate
 from conftest import art6, art9, business_function, make_apd, schedule1
@@ -43,6 +45,15 @@ def make_basis(session, activity, **overrides):
     session.add(basis)
     session.flush()
     return basis
+
+
+def make_dpia(session, activity, **overrides):
+    defaults = dict(activity_id=activity.id, screening_outcome=ScreeningOutcome.NOT_REQUIRED)
+    defaults.update(overrides)
+    dpia = DPIA(**defaults)
+    session.add(dpia)
+    session.flush()
+    return dpia
 
 
 def test_rule2_fires_when_schedule1_missing(session, actor, frs_profile):
@@ -180,6 +191,7 @@ def test_rule6_clears_with_consent_when_not_children(session, actor, frs_profile
 
 def test_rule6_children_matrix_fires_without_age_check(session, actor, frs_profile):
     activity = make_activity(session, actor, children_flag=True)
+    make_dpia(session, activity)
     basis = make_basis(session, activity, art6_basis=art6(session, "a"))
     session.add(
         ConsentRecord(
@@ -200,6 +212,7 @@ def test_rule6_children_matrix_fires_when_under13_without_parental_consent(
     session, actor, frs_profile
 ):
     activity = make_activity(session, actor, children_flag=True)
+    make_dpia(session, activity)
     basis = make_basis(session, activity, art6_basis=art6(session, "a"))
     session.add(
         ConsentRecord(
@@ -220,6 +233,7 @@ def test_rule6_children_matrix_fires_when_under13_without_parental_consent(
 
 def test_rule6_children_matrix_clears_when_complete(session, actor, frs_profile):
     activity = make_activity(session, actor, children_flag=True)
+    make_dpia(session, activity)
     basis = make_basis(session, activity, art6_basis=art6(session, "a"))
     session.add(
         ConsentRecord(

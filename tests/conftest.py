@@ -26,6 +26,7 @@ from cairn.models import (
     Schedule1Condition,
     Schedule8Condition,
     SpecialCategoryCondition,
+    TransferMechanism,
     User,
 )
 from cairn.regime import set_regime_policy
@@ -119,6 +120,12 @@ def schedule1(session, paragraph):
 def schedule8(session, paragraph):
     return session.scalars(
         select(Schedule8Condition).where(Schedule8Condition.paragraph == paragraph)
+    ).one()
+
+
+def transfer_mechanism(session, code):
+    return session.scalars(
+        select(TransferMechanism).where(TransferMechanism.code == code)
     ).one()
 
 

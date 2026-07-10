@@ -250,3 +250,49 @@ def seeded_web_engine(tmp_path):
 @pytest.fixture
 def seeded_client(seeded_web_engine):
     return TestClient(_wire_app(seeded_web_engine), follow_redirects=False)
+
+
+@pytest.fixture
+def activities_web_engine(tmp_path):
+    engine = _sqlite_engine(tmp_path / "activities.db")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        profile = OrganisationProfile(
+            org_name="Activities Fire & Rescue Service",
+            org_type=OrgType.PUBLIC_AUTHORITY,
+            applicable_regimes=[Regime.GENERAL, Regime.LAW_ENFORCEMENT],
+            active_modules=["complaints", "external_data", "dpia"],
+            public_authority_guards=True,
+        )
+        db.add(profile)
+        db.flush()
+        seed_legal(db)
+        seed_frs_pack(db)
+        prevention = business_function(db, "Prevention & Community Safety")
+        protection = business_function(
+            db, "Protection (Fire Safety Regulation & Enforcement)"
+        )
+        db.add_all(
+            [
+                User(display_name="Ada Approver", role=Role.APPROVER_DPO),
+                User(display_name="Cara Curator", role=Role.CURATOR),
+                User(
+                    display_name="Cody Contributor",
+                    role=Role.CONTRIBUTOR,
+                    business_function_id=prevention.id,
+                ),
+                User(
+                    display_name="Ollie OtherFunction",
+                    role=Role.CONTRIBUTOR,
+                    business_function_id=protection.id,
+                ),
+                User(display_name="Vic Viewer", role=Role.VIEWER),
+            ]
+        )
+        db.commit()
+    return engine
+
+
+@pytest.fixture
+def activities_client(activities_web_engine):
+    return TestClient(_wire_app(activities_web_engine), follow_redirects=False)

@@ -86,3 +86,21 @@
   </div>
 </div>
 {% endmacro %}
+
+{% macro textarea(name, label, value="", hint=None, error=None, rows=5) %}
+<div class="govuk-form-group{{ ' govuk-form-group--error' if error else '' }}">
+  <label class="govuk-label" for="{{ name }}">{{ label }}</label>
+  {% if hint %}<div class="govuk-hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+  {% if error %}<p class="govuk-error-message" id="{{ name }}-error"><span class="govuk-visually-hidden">Error:</span> {{ error }}</p>{% endif %}
+  <textarea class="govuk-textarea{{ ' govuk-textarea--error' if error else '' }}" id="{{ name }}" name="{{ name }}" rows="{{ rows }}">{{ value }}</textarea>
+</div>
+{% endmacro %}
+
+{% macro date_input(name, label, value="", hint=None, error=None) %}
+<div class="govuk-form-group{{ ' govuk-form-group--error' if error else '' }}">
+  <label class="govuk-label" for="{{ name }}">{{ label }}</label>
+  {% if hint %}<div class="govuk-hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+  {% if error %}<p class="govuk-error-message" id="{{ name }}-error"><span class="govuk-visually-hidden">Error:</span> {{ error }}</p>{% endif %}
+  <input class="govuk-input govuk-input--width-10{{ ' govuk-input--error' if error else '' }}" id="{{ name }}" name="{{ name }}" type="date" value="{{ value }}">
+</div>
+{% endmacro %}

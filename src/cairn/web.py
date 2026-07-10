@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 import cairn
+from cairn.activities import router as activities_router
 from cairn.auth import LoginRequired, current_user, get_csrf_token
 from cairn.auth import router as auth_router
 from cairn.db import get_session
@@ -22,6 +23,8 @@ GOVUK_ASSETS_DIR = STATIC_DIR / "govuk" / "assets"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    if settings.auth_mode != "dev" and settings.session_secret == "dev-secret-change-me":
+        raise RuntimeError("SESSION_SECRET must be set when AUTH_MODE is not 'dev'")
     app = FastAPI()
 
     app.add_middleware(
@@ -56,6 +59,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(setup_router)
+    app.include_router(activities_router)
 
     @app.get("/")
     def home(

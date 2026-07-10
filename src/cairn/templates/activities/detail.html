@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% from "macros.html" import select, text_input %}
+{% from "activities/_junction_macros.html" import simple_junction_section, data_categories_section %}
+{% block title %}{{ activity.name }}{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ activity.name }}</h1>
+
+{% if error %}
+<div class="govuk-error-summary" data-module="govuk-error-summary">
+  <div role="alert">
+    <h2 class="govuk-error-summary__title">There is a problem</h2>
+    <div class="govuk-error-summary__body">{{ error }}</div>
+  </div>
+</div>
+{% endif %}
+
+<p class="govuk-body">
+  <strong class="govuk-tag">{{ record_status_labels[activity.record_status] }}</strong>
+  <strong class="govuk-tag govuk-tag--purple">{{ regime_labels[activity.regime] }}</strong>
+  {% for view in export_views %}<strong class="govuk-tag govuk-tag--turquoise">{{ view }}</strong>{% endfor %}
+</p>
+
+{% if can_edit %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/edit">Edit activity</a></p>
+{% endif %}
+
+<h2 class="govuk-heading-m">Details</h2>
+<dl class="govuk-summary-list">
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Reference</dt>
+    <dd class="govuk-summary-list__value">{{ activity.reference or "" }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Business function</dt>
+    <dd class="govuk-summary-list__value">{{ business_function_label }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Description</dt>
+    <dd class="govuk-summary-list__value">{{ activity.description or "" }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Activity type</dt>
+    <dd class="govuk-summary-list__value">{{ activity.activity_type.value }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Activity domain</dt>
+    <dd class="govuk-summary-list__value">{{ activity.activity_domain.value if activity.activity_domain else "" }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Controller or processor</dt>
+    <dd class="govuk-summary-list__value">{{ activity.controller_or_processor.value }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Lifecycle stage</dt>
+    <dd class="govuk-summary-list__value">{{ activity.lifecycle_stage.value }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Purpose</dt>
+    <dd class="govuk-summary-list__value">{{ activity.purpose }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Categories of processing</dt>
+    <dd class="govuk-summary-list__value">{{ activity.categories_of_processing or "" }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Personal data source</dt>
+    <dd class="govuk-summary-list__value">{{ activity.personal_data_source | join(", ") }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Owner</dt>
+    <dd class="govuk-summary-list__value">{{ users_by_id.get(activity.owner_id, "") }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Last reviewed</dt>
+    <dd class="govuk-summary-list__value">{{ activity.last_reviewed_at or "" }}</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">Next review</dt>
+    <dd class="govuk-summary-list__value">{{ activity.next_review_at }}</dd>
+  </div>
+</dl>
+
+<h2 class="govuk-heading-m">Derived flags</h2>
+<ul class="govuk-list govuk-list--bullet">
+  <li>Special category: {{ "Yes" if activity.special_category_flag else "No" }}</li>
+  <li>Criminal offence: {{ "Yes" if activity.criminal_offence_flag else "No" }}</li>
+  <li>Vulnerable / safeguarding: {{ "Yes" if activity.vulnerable_or_safeguarding_flag else "No" }}</li>
+  <li>Children: {{ "Yes" if activity.children_flag else "No" }}</li>
+  <li>High risk: {{ "Yes" if activity.high_risk_flag else "No" }}</li>
+  <li>ADM / profiling: {{ "Yes" if activity.adm_profiling_flag else "No" }}</li>
+</ul>
+
+{% if activity.regime.value == "law_enforcement" %}
+<h2 class="govuk-heading-m">Law enforcement (Part 3) fields</h2>
+<ul class="govuk-list govuk-list--bullet">
+  <li>Data subject classification: {{ (activity.le_data_subject_classification or []) | join(", ") }}</li>
+  <li>Fact vs assessment noted: {{ "Yes" if activity.le_fact_vs_assessment_noted else "No" }}</li>
+  <li>s62 logging note: {{ activity.s62_logging_note or "" }}</li>
+</ul>
+{% endif %}
+
+{{ simple_junction_section("data-subjects", "Data subjects", data_subjects, data_subject_options, activity.id, csrf_token) }}
+{{ data_categories_section(data_category_rows, data_category_options, data_subject_scope_options, activity.id, csrf_token) }}
+{{ simple_junction_section("recipients", "Recipients", recipients, recipient_options, activity.id, csrf_token) }}
+{{ simple_junction_section("systems", "Systems", systems, system_options, activity.id, csrf_token) }}
+{{ simple_junction_section("data-sources", "External data sources", data_sources, data_source_options, activity.id, csrf_token) }}
+
+{% include "activities/_findings_section.html" %}
+
+<h2 class="govuk-heading-m">Status</h2>
+{% if can_edit and activity.record_status.value == "draft" %}
+<form method="post" action="/activities/{{ activity.id }}/status">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="target_status" value="in_review">
+  <button type="submit" class="govuk-button" data-module="govuk-button">Send for review</button>
+</form>
+{% endif %}
+{% if can_edit and activity.record_status.value == "in_review" %}
+<form method="post" action="/activities/{{ activity.id }}/status">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="target_status" value="draft">
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Return to draft</button>
+</form>
+{% endif %}
+{% if can_activate and activity.record_status.value == "in_review" %}
+<form method="post" action="/activities/{{ activity.id }}/status">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="target_status" value="active">
+  <button type="submit" class="govuk-button" data-module="govuk-button">Activate</button>
+</form>
+{% endif %}
+{% if can_activate and activity.record_status.value == "active" %}
+<form method="post" action="/activities/{{ activity.id }}/status">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="target_status" value="retired">
+  <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Retire</button>
+</form>
+{% endif %}
+
+{% if can_override_regime %}
+<h2 class="govuk-heading-m">Regime override</h2>
+<form method="post" action="/activities/{{ activity.id }}/regime-override">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {{ select("target_regime", "Target regime", regime_labels.items() | list, selected=activity.regime.value) }}
+  {{ text_input("reason", "Reason (mandatory)") }}
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Override regime</button>
+</form>
+{% endif %}
+
+<h2 class="govuk-heading-m">Version history</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Version</th>
+      <th scope="col" class="govuk-table__header">Changed at</th>
+      <th scope="col" class="govuk-table__header">Changed by</th>
+      <th scope="col" class="govuk-table__header">Change note</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for v in versions %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ v.entity_version }}</td>
+      <td class="govuk-table__cell">{{ v.changed_at }}</td>
+      <td class="govuk-table__cell">{{ users_by_id.get(v.changed_by, "") }}</td>
+      <td class="govuk-table__cell">{{ v.version_change_note or "" }}</td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="4">No prior versions.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="govuk-heading-m">Regime and status audit events</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Event</th>
+      <th scope="col" class="govuk-table__header">Occurred at</th>
+      <th scope="col" class="govuk-table__header">Actor</th>
+      <th scope="col" class="govuk-table__header">Reason</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for e in regime_events %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ e.event }}</td>
+      <td class="govuk-table__cell">{{ e.occurred_at }}</td>
+      <td class="govuk-table__cell">{{ users_by_id.get(e.actor_id, "") }}</td>
+      <td class="govuk-table__cell">{{ e.reason or "" }}</td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="4">No regime or status events.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

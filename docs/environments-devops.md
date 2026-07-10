@@ -29,7 +29,7 @@ One image serves all environments; behaviour differs only by injected configurat
 
 1. Work happens on a branch; merge to `main` only with CI green (test + docker jobs).
 2. A release is a **git tag `vX.Y.Z`** on `main`; the image is built from that tag and labelled with it (`cairn:X.Y.Z`). `cairn.__version__` and the tag move together.
-3. Deploy = pull/replace the image, run Alembic migrations (from 2a onwards), start, verify `/healthz`. Rollback = redeploy the previous tag; **migrations are forward-only** — a bad release rolls the app back, not the schema, so migrations must be backwards-compatible one version.
+3. Deploy = pull/replace the image, run `alembic upgrade head` (the image carries `alembic.ini` + `migrations/`; e.g. `docker run --rm -e DATABASE_URL=… cairn:X.Y.Z alembic upgrade head`), start, verify `/healthz`. Rollback = redeploy the previous tag; **migrations are forward-only** — a bad release rolls the app back, not the schema, so migrations must be backwards-compatible one version.
 4. Seed updates (legal vocabularies, sector packs) ship as versioned migrations/data updates, never manual SQL — the legislation-watch path (Phase 6) rides the same release process.
 
 ## 4. Runbooks (operational commitments from NFRs v0.1)
@@ -41,7 +41,7 @@ One image serves all environments; behaviour differs only by injected configurat
 
 ## 5. Deferred (intentionally)
 
-- **Alembic** — adopts at the start of sub-phase 2a (Solution Architecture §1); until then `create_all` covers dev/test.
+- ~~**Alembic** — adopts at the start of sub-phase 2a~~ *(adopted in 2a: initial migration + parity test; tests still use `create_all` for speed).*
 - **Image registry & signed releases** — decided with the first real deployment estate.
 - **Infrastructure-as-code beyond compose** — the compose file *is* the reference; estate-specific IaC (Terraform/Bicep) belongs to each deployment, not the product repo.
 

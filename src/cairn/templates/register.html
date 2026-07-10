@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Combined register</h1>
+<p class="govuk-body">All processing activities across both regimes.</p>
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Name</th>
+      <th scope="col" class="govuk-table__header">Business function</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+      <th scope="col" class="govuk-table__header">Regime</th>
+      <th scope="col" class="govuk-table__header">Export view</th>
+      <th scope="col" class="govuk-table__header">Owner</th>
+      <th scope="col" class="govuk-table__header">Next review</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/activities/{{ row.activity.id }}">{{ row.activity.name }}</a></td>
+      <td class="govuk-table__cell">{{ row.business_function_label }}</td>
+      <td class="govuk-table__cell"><strong class="govuk-tag">{{ record_status_labels[row.activity.record_status] }}</strong></td>
+      <td class="govuk-table__cell"><strong class="govuk-tag govuk-tag--purple">{{ regime_labels[row.activity.regime] }}</strong></td>
+      <td class="govuk-table__cell">
+        {% for view in row.export_views %}<strong class="govuk-tag govuk-tag--turquoise">{{ view }}</strong>{% endfor %}
+      </td>
+      <td class="govuk-table__cell">{{ row.owner }}</td>
+      <td class="govuk-table__cell">{{ row.activity.next_review_at }}</td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell" colspan="7">No processing activities recorded.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

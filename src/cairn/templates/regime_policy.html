@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, radios, textarea %}
+{% block title %}Regime Policy{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Regime Policy</h1>
+<p class="govuk-body">Assign the authoritative data protection regime for each activity domain. Changes cascade to policy-sourced activities in that domain; manual overrides are untouched. Every change is audited.</p>
+
+{{ error_summary(errors) }}
+
+{% if moved is not none %}
+<div class="govuk-notification-banner govuk-notification-banner--success" role="alert" data-module="govuk-notification-banner">
+  <div class="govuk-notification-banner__header">
+    <h2 class="govuk-notification-banner__title">Success</h2>
+  </div>
+  <div class="govuk-notification-banner__content">
+    <p class="govuk-notification-banner__heading">
+      Policy saved{{ " for " ~ moved_domain if moved_domain else "" }}. {{ moved }} activit{{ "y" if moved == 1 else "ies" }} moved to the new regime.
+    </p>
+  </div>
+</div>
+{% endif %}
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Activity domain</th>
+      <th scope="col" class="govuk-table__header">Assigned regime</th>
+      <th scope="col" class="govuk-table__header">Rationale</th>
+      <th scope="col" class="govuk-table__header">Last change</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.label }}</td>
+      <td class="govuk-table__cell">
+        {% if row.current_regime %}
+        <strong class="govuk-tag govuk-tag--purple">{{ regime_labels[row.current_regime] }}</strong>
+        {% else %}
+        Not set — defaults to General (UK GDPR / DPA 2018 Part 2)
+        {% endif %}
+      </td>
+      <td class="govuk-table__cell">{{ row.policy.rationale if row.policy else "" }}</td>
+      <td class="govuk-table__cell">{{ row.policy.updated_at if row.policy else "" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% for row in rows %}
+<h2 class="govuk-heading-m">{{ row.label }}</h2>
+<form method="post" action="/regime-policy/{{ row.domain.value }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {{ radios("assigned_regime", "Assigned regime", regime_labels.items() | list, checked=(row.current_regime.value if row.current_regime else "general")) }}
+  {{ textarea("rationale", "Rationale (mandatory)", row.policy.rationale if row.policy else "", rows=3) }}
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Set policy</button>
+</form>
+{% endfor %}
+
+<h2 class="govuk-heading-m">Policy change history</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Occurred at</th>
+      <th scope="col" class="govuk-table__header">Event</th>
+      <th scope="col" class="govuk-table__header">Subject</th>
+      <th scope="col" class="govuk-table__header">Change</th>
+      <th scope="col" class="govuk-table__header">Actor</th>
+      <th scope="col" class="govuk-table__header">Reason</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for e in history %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ e.occurred_at }}</td>
+      <td class="govuk-table__cell">{{ e.event }}</td>
+      <td class="govuk-table__cell">
+        {% if e.entity_type == "processing_activity" %}
+        <a class="govuk-link" href="/activities/{{ e.entity_id }}">{{ activity_names.get(e.entity_id, e.entity_id) }}</a>
+        {% else %}
+        Regime Policy
+        {% endif %}
+      </td>
+      <td class="govuk-table__cell">
+        {% if e.old_value %}{{ e.old_value.values() | join(", ") }} &rarr; {% endif %}{{ e.new_value.values() | join(", ") if e.new_value else "" }}
+      </td>
+      <td class="govuk-table__cell">{{ users_by_id.get(e.actor_id, "") }}</td>
+      <td class="govuk-table__cell">{{ e.reason or "" }}</td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="6">No policy changes yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

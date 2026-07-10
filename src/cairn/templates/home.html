@@ -1,6 +1,123 @@
 {% extends "base.html" %}
-{% block title %}Home{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block content %}
 <h1 class="govuk-heading-l">{{ profile.org_name }}</h1>
 <p class="govuk-body">Signed in as {{ user.display_name }} ({{ user.role.value }}).</p>
+
+<nav class="govuk-!-margin-bottom-6">
+  <a class="govuk-link govuk-!-margin-right-4" href="/register">Register</a>
+  <a class="govuk-link govuk-!-margin-right-4" href="/activities">Processing activities</a>
+  <a class="govuk-link govuk-!-margin-right-4" href="/vocabularies">Vocabularies</a>
+  {% if user.role.value == "approver_dpo" %}
+  <a class="govuk-link" href="/regime-policy">Regime Policy</a>
+  {% endif %}
+</nav>
+
+<h2 class="govuk-heading-m">Register overview</h2>
+<p class="govuk-body">{{ total_activities }} processing activit{{ "y" if total_activities == 1 else "ies" }} recorded.</p>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-one-third">
+    <h3 class="govuk-heading-s">By record status</h3>
+    <table class="govuk-table">
+      <tbody class="govuk-table__body">
+        {% for label, count in status_counts %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ label }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="govuk-grid-column-one-third">
+    <h3 class="govuk-heading-s">By regime</h3>
+    <table class="govuk-table">
+      <tbody class="govuk-table__body">
+        {% for label, count in regime_counts %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ label }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="govuk-grid-column-one-third">
+    <h3 class="govuk-heading-s">By business function</h3>
+    <table class="govuk-table">
+      <tbody class="govuk-table__body">
+        {% for label, count in function_counts %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ label }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ count }}</td>
+        </tr>
+        {% else %}
+        <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="2">No activities yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2 class="govuk-heading-m">Findings</h2>
+<p class="govuk-body">
+  Across non-retired activities:
+  <strong class="govuk-tag govuk-tag--red">{{ block_count }} blocking</strong>
+  <strong class="govuk-tag govuk-tag--yellow">{{ warn_count }} warning</strong>
+</p>
+
+<h2 class="govuk-heading-m">Overdue reviews</h2>
+{% if overdue %}
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Business function</th>
+      <th scope="col" class="govuk-table__header">Next review</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for activity in overdue %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/activities/{{ activity.id }}">{{ activity.name }}</a></td>
+      <td class="govuk-table__cell">{{ function_labels.get(activity.business_function_id, "") }}</td>
+      <td class="govuk-table__cell">{{ activity.next_review_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="govuk-body">No overdue reviews.</p>
+{% endif %}
+
+<h2 class="govuk-heading-m">Trials ending soon</h2>
+{% if trials_due %}
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Trial end</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for activity in trials_due %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/activities/{{ activity.id }}">{{ activity.name }}</a></td>
+      <td class="govuk-table__cell">{{ activity.trial_end }}</td>
+      <td class="govuk-table__cell">
+        {% if activity.trial_end < today %}
+        <strong class="govuk-tag govuk-tag--red">Past end date</strong>
+        {% else %}
+        <strong class="govuk-tag govuk-tag--yellow">Ending soon</strong>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="govuk-body">No trials ending within 60 days.</p>
+{% endif %}
 {% endblock %}

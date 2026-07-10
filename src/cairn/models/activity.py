@@ -28,10 +28,12 @@ from cairn.models.vocab import (
 
 if TYPE_CHECKING:
     from cairn.models.supporting import (
+        DPIA,
         ContractDSA,
         DecisionSupportADM,
         LawfulBasisRecord,
         PrivacyNotice,
+        Transfer,
     )
 
 activity_datasubject = Table(
@@ -140,6 +142,20 @@ class ProcessingActivity(AuditedBase):
     adm_records: Mapped[list[DecisionSupportADM]] = relationship(
         "DecisionSupportADM", back_populates="activity"
     )
+    dpias: Mapped[list[DPIA]] = relationship("DPIA", back_populates="activity")
+    transfers: Mapped[list[Transfer]] = relationship("Transfer", back_populates="activity")
+    feeds: Mapped[list[ActivityFeeds]] = relationship(
+        "ActivityFeeds",
+        foreign_keys="ActivityFeeds.source_activity_id",
+        back_populates="source_activity",
+    )
+    fed_by: Mapped[list[ActivityFeeds]] = relationship(
+        "ActivityFeeds",
+        foreign_keys="ActivityFeeds.consumer_activity_id",
+        back_populates="consumer_activity",
+    )
+    retention_links: Mapped[list[ActivityRetention]] = relationship(back_populates="activity")
+    security_links: Mapped[list[ActivitySecurity]] = relationship(back_populates="activity")
     data_category_links: Mapped[list[ActivityDataCategory]] = relationship(
         back_populates="activity"
     )
@@ -186,6 +202,8 @@ class ActivitySecurity(AuditedBase):
     security_measure_id: Mapped[str] = mapped_column(ForeignKey("security_measure.id"))
     inherited_from_system: Mapped[bool] = mapped_column(default=False)
 
+    activity: Mapped[ProcessingActivity] = relationship(back_populates="security_links")
+
 
 class ActivityRetention(AuditedBase):
     __tablename__ = "activity_retention"
@@ -199,6 +217,8 @@ class ActivityRetention(AuditedBase):
         ForeignKey("personal_data_category.id")
     )
 
+    activity: Mapped[ProcessingActivity] = relationship(back_populates="retention_links")
+
 
 class ActivityFeeds(AuditedBase):
     __tablename__ = "activity_feeds"
@@ -209,3 +229,10 @@ class ActivityFeeds(AuditedBase):
 
     source_activity_id: Mapped[str] = mapped_column(ForeignKey("processing_activity.id"))
     consumer_activity_id: Mapped[str] = mapped_column(ForeignKey("processing_activity.id"))
+
+    source_activity: Mapped[ProcessingActivity] = relationship(
+        foreign_keys=[source_activity_id], back_populates="feeds"
+    )
+    consumer_activity: Mapped[ProcessingActivity] = relationship(
+        foreign_keys=[consumer_activity_id], back_populates="fed_by"
+    )

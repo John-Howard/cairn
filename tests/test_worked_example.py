@@ -156,6 +156,13 @@ def test_hfsv_risk_model_feeds_operational_targeting(session, actor, frs_profile
             residual_risk=ResidualRisk.MEDIUM,
         )
     )
+    session.add(
+        DPIA(
+            activity_id=operational.id,
+            screening_outcome=ScreeningOutcome.REQUIRED,
+            residual_risk=ResidualRisk.LOW,
+        )
+    )
     session.flush()
     session.expire_all()
 

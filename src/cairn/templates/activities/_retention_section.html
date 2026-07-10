@@ -1,0 +1,54 @@
+<h2 class="govuk-heading-m">Retention</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Rule</th>
+      <th scope="col" class="govuk-table__header">Scope</th>
+      <th scope="col" class="govuk-table__header"></th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in retention_rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.rule_label }}</td>
+      <td class="govuk-table__cell">{{ row.scope_label }}</td>
+      <td class="govuk-table__cell">
+        {% if can_author_registers %}
+        <form method="post" action="/activities/{{ activity.id }}/retention/{{ row.link_id }}/remove">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="3">No retention rules linked.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_author_registers %}
+{% for suggestion in retention_suggestions %}
+<form method="post" action="/activities/{{ activity.id }}/retention">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="retention_rule_id" value="{{ suggestion.rule_id }}">
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Suggested from {{ suggestion.system_label }}: {{ suggestion.rule_label }}</button>
+</form>
+{% endfor %}
+{% if retention_rule_options %}
+<form method="post" action="/activities/{{ activity.id }}/retention">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <select class="govuk-select" name="retention_rule_id">
+    {% for value, text in retention_rule_options %}
+    <option value="{{ value }}">{{ text }}</option>
+    {% endfor %}
+  </select>
+  <select class="govuk-select" name="data_category_scope_id">
+    <option value="">All linked categories</option>
+    {% for value, text in retention_scope_options %}
+    <option value="{{ value }}">{{ text }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add retention rule</button>
+</form>
+{% endif %}
+{% endif %}

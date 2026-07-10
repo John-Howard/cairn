@@ -7,6 +7,7 @@ from cairn.models import (
     LIADecision,
     LIARLIRecord,
     PersonalDataCategory,
+    PrivacyNotice,
     ProcessingActivity,
     RegimeScope,
 )
@@ -72,6 +73,19 @@ def test_external_data_rule_gated_by_module(session, frs_profile, private_profil
     assert evaluate(activity, private_profile) == []
 
     activity.data_sources.append(ExternalDataSource(name="CACI Acorn"))
+    session.flush()
+    remaining = evaluate(activity, frs_profile)
+    assert [f.rule_id for f in remaining] == ["8"]
+    assert "Art 14" in remaining[0].message
+
+    activity.privacy_notices.append(
+        PrivacyNotice(
+            notice_version="1.0",
+            publish_date=date(2026, 1, 1),
+            covers_art13=False,
+            covers_art14=True,
+        )
+    )
     session.flush()
     assert evaluate(activity, frs_profile) == []
 

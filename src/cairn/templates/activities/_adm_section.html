@@ -1,0 +1,34 @@
+{% if show_adm %}
+<h2 class="govuk-heading-m">Decision-support / ADM</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Use mode</th>
+      <th scope="col" class="govuk-table__header">Solely automated</th>
+      <th scope="col" class="govuk-table__header">Significant effects</th>
+      <th scope="col" class="govuk-table__header">Data sources</th>
+      <th scope="col" class="govuk-table__header">Transparency ref</th>
+      <th scope="col" class="govuk-table__header"></th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in adm_rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ adm_use_mode_labels[row.adm.use_mode] }}</td>
+      <td class="govuk-table__cell">{{ "Yes" if row.adm.solely_automated else "No" }}</td>
+      <td class="govuk-table__cell">{{ "Yes" if row.adm.significant_effects else "No" }}</td>
+      <td class="govuk-table__cell">{{ row.data_source_labels | join(", ") }}</td>
+      <td class="govuk-table__cell">{{ row.transparency_label }}</td>
+      <td class="govuk-table__cell">
+        {% if can_author_registers %}<a class="govuk-link" href="/activities/{{ activity.id }}/adm/{{ row.adm.id }}/edit">Edit</a>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="6">No ADM records.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_author_registers %}
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}/adm/new">Add ADM record</a></p>
+{% endif %}
+{% endif %}

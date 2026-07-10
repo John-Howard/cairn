@@ -11,6 +11,7 @@ from cairn.auth import current_user, get_csrf_token, verify_csrf
 from cairn.basis import basis_detail_context
 from cairn.db import get_session
 from cairn.export import export_views
+from cairn.inheritance import sync_inherited_security
 from cairn.models import (
     ActivityDataCategory,
     ActivityDomain,
@@ -28,6 +29,7 @@ from cairn.models import (
     OrganisationProfile,
     PersonalDataCategory,
     PersonalDataSource,
+    PrivacyNotice,
     ProcessingActivity,
     Recipient,
     RecordStatus,
@@ -39,6 +41,7 @@ from cairn.models import (
     User,
 )
 from cairn.regime import override_activity_regime, resolve_regime
+from cairn.registers import register_detail_context
 from cairn.rules import Severity, evaluate
 from cairn.templating import templates
 
@@ -145,6 +148,7 @@ SIMPLE_JUNCTIONS: dict[str, SimpleJunction] = {
     "systems": SimpleJunction("systems", SystemAsset, "system"),
     "data-sources": SimpleJunction("data_sources", ExternalDataSource, "external data source"),
     "controllers": SimpleJunction("controllers", LegalEntity, "controller (legal entity)"),
+    "privacy-notices": SimpleJunction("privacy_notices", PrivacyNotice, "privacy notice"),
 }
 
 SECTION_TITLES = {
@@ -153,6 +157,7 @@ SECTION_TITLES = {
     "systems": "Systems",
     "data-sources": "External data sources",
     "controllers": "Controllers",
+    "privacy-notices": "Privacy notices",
 }
 
 JUNCTION_CONTEXT_KEYS = {
@@ -161,11 +166,17 @@ JUNCTION_CONTEXT_KEYS = {
     "systems": ("systems", "system_options"),
     "data-sources": ("data_sources", "data_source_options"),
     "controllers": ("controllers", "controller_options"),
+    "privacy-notices": ("privacy_notices", "privacy_notice_options"),
 }
 
 
 def _display_label(obj) -> str:
-    return getattr(obj, "label", None) or getattr(obj, "name", None) or str(obj.id)
+    return (
+        getattr(obj, "label", None)
+        or getattr(obj, "name", None)
+        or getattr(obj, "notice_version", None)
+        or str(obj.id)
+    )
 
 
 def _get_activity(session: Session, activity_id: str) -> ProcessingActivity:
@@ -392,6 +403,7 @@ def _form_context(
 ) -> dict:
     error_map = {e["field"]: e["message"] for e in errors}
     is_law_enforcement = activity.regime == Regime.LAW_ENFORCEMENT if activity else False
+    trial_hint = activity is not None and activity.lifecycle_stage == LifecycleStage.TRIAL
     return {
         "user": user,
         "activity": activity,
@@ -401,6 +413,7 @@ def _form_context(
         "error_map": error_map,
         "csrf_token": csrf_token,
         "is_law_enforcement": is_law_enforcement,
+        "trial_hint": trial_hint,
         "regime_labels": REGIME_LABELS,
         "business_function_options": _business_function_options(session),
         "user_options": _user_options(session),
@@ -421,6 +434,7 @@ def _junction_context(session: Session, activity: ProcessingActivity) -> dict:
     linked_system_ids = {s.id for s in activity.systems}
     linked_source_ids = {s.id for s in activity.data_sources}
     linked_controller_ids = {c.id for c in activity.controllers}
+    linked_notice_ids = {n.id for n in activity.privacy_notices}
     linked_category_ids = {link.category_id for link in activity.data_category_links}
     subject_labels = {
         s.id: _display_label(s) for s in session.scalars(select(DataSubjectCategory)).all()
@@ -438,6 +452,8 @@ def _junction_context(session: Session, activity: ProcessingActivity) -> dict:
         "data_source_options": _available_options(session, ExternalDataSource, linked_source_ids),
         "controllers": [(c.id, _display_label(c)) for c in activity.controllers],
         "controller_options": _available_options(session, LegalEntity, linked_controller_ids),
+        "privacy_notices": [(n.id, _display_label(n)) for n in activity.privacy_notices],
+        "privacy_notice_options": _available_options(session, PrivacyNotice, linked_notice_ids),
         "data_category_rows": [
             {
                 "link_id": link.id,
@@ -506,6 +522,7 @@ def _render_detail(
         **_findings_context(activity, profile),
         **_junction_context(session, activity),
         **basis_detail_context(session, activity, user),
+        **register_detail_context(session, activity, user),
     }
     return templates.TemplateResponse(
         request, "activities/detail.html", context, status_code=status_code
@@ -697,6 +714,29 @@ async def update_activity(
             status_code=403,
             detail="Contributors may only edit activities within their own business function",
         )
+    if (
+        activity.lifecycle_stage == LifecycleStage.TRIAL
+        and values["lifecycle_stage"] == LifecycleStage.LIVE.value
+        and user.role != Role.APPROVER_DPO
+    ):
+        errors = [
+            {
+                "field": "lifecycle_stage",
+                "message": "Only the DPO/approver may move a trial to live",
+            }
+        ]
+        context = _form_context(
+            session,
+            user,
+            activity=activity,
+            values=values,
+            errors=errors,
+            csrf_token=get_csrf_token(request),
+            is_edit=True,
+        )
+        return templates.TemplateResponse(
+            request, "activities/form.html", context, status_code=403
+        )
     errors = _validate_activity(
         session, values, is_law_enforcement=activity.regime == Regime.LAW_ENFORCEMENT
     )
@@ -880,6 +920,8 @@ async def add_simple_junction(
     if item not in collection:
         collection.append(item)
         session.flush()
+        if kind == "systems":
+            sync_inherited_security(session, activity)
     return _junction_fragment_response(request, session, activity, kind)
 
 
@@ -904,4 +946,6 @@ async def remove_simple_junction(
     if item is not None and item in collection:
         collection.remove(item)
         session.flush()
+        if kind == "systems":
+            sync_inherited_security(session, activity)
     return _junction_fragment_response(request, session, activity, kind)

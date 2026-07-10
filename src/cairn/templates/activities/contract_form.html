@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, select, textarea, checkbox, checkboxes, date_input %}
+{% block title %}{{ "Edit" if is_edit else "Add" }} contract{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit" if is_edit else "Add" }} contract / DSA</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="/activities/{{ activity.id }}/contracts/{{ (contract_id ~ '/edit') if is_edit else 'new' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {{ select("type", "Contract type", contract_type_options, selected=values.type) }}
+  {{ checkboxes("parties", "Parties (Legal Entities)", party_options, checked=values.parties) }}
+  {% if error_map.get("parties") %}<p class="govuk-error-message">{{ error_map.get("parties") }}</p>{% endif %}
+  {{ checkbox("art28_checklist_complete", "Art 28 checklist complete", checked=values.art28_checklist_complete, hint="Relevant for controller-processor contracts.") }}
+  {{ textarea("security_schedule", "Security schedule", values.security_schedule) }}
+  {{ select("sub_processor_authorisation", "Sub-processor authorisation", sub_processor_authorisation_options, selected=values.sub_processor_authorisation) }}
+  {{ date_input("start_date", "Start date", values.start_date, error=error_map.get("start_date")) }}
+  {{ date_input("review_date", "Review date", values.review_date, error=error_map.get("review_date")) }}
+  {{ date_input("expiry_date", "Expiry date", values.expiry_date, error=error_map.get("expiry_date")) }}
+
+  {% if is_edit %}
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+  {% endif %}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">Save</button>
+</form>
+<p class="govuk-body"><a class="govuk-link" href="/activities/{{ activity.id }}">Back to activity</a></p>
+{% endblock %}

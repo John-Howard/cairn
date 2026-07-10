@@ -21,6 +21,7 @@ from cairn.models import (
     LegalEntity,
     LegalEntityRoleType,
     PersonalDataCategory,
+    PrivacyNotice,
     Recipient,
     RecipientType,
     RetentionRule,
@@ -284,6 +285,18 @@ VOCABULARIES: dict[str, VocabSpec] = {
             fields=[
                 VocabField("paragraph", "Paragraph", "text"),
                 VocabField("label", "Label", "text"),
+            ],
+        ),
+        VocabSpec(
+            key="privacy-notices",
+            model=PrivacyNotice,
+            display_name="Privacy notice",
+            label_attr="notice_version",
+            fields=[
+                VocabField("notice_version", "Notice version", "text", required=True),
+                VocabField("publish_date", "Publish date", "date", required=True),
+                VocabField("covers_art13", "Covers Art 13", "bool"),
+                VocabField("covers_art14", "Covers Art 14", "bool"),
             ],
         ),
         VocabSpec(

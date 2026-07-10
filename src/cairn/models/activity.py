@@ -20,6 +20,7 @@ from cairn.models.enums import (
 from cairn.models.vocab import (
     DataSubjectCategory,
     ExternalDataSource,
+    LegalEntity,
     PersonalDataCategory,
     Recipient,
     SystemAsset,
@@ -75,6 +76,13 @@ activity_datasource = Table(
     Column("source_id", ForeignKey("external_data_source.id"), primary_key=True),
 )
 
+activity_controller = Table(
+    "activity_controller",
+    Base.metadata,
+    Column("activity_id", ForeignKey("processing_activity.id"), primary_key=True),
+    Column("legal_entity_id", ForeignKey("legal_entity.id"), primary_key=True),
+)
+
 
 class ProcessingActivity(AuditedBase):
     __tablename__ = "processing_activity"
@@ -119,6 +127,7 @@ class ProcessingActivity(AuditedBase):
     data_sources: Mapped[list[ExternalDataSource]] = relationship(secondary=activity_datasource)
     recipients: Mapped[list[Recipient]] = relationship(secondary=activity_recipient)
     systems: Mapped[list[SystemAsset]] = relationship(secondary=activity_system)
+    controllers: Mapped[list[LegalEntity]] = relationship(secondary=activity_controller)
     contracts: Mapped[list[ContractDSA]] = relationship(
         "ContractDSA", secondary="activity_contract"
     )

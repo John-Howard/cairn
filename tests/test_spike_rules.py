@@ -4,6 +4,8 @@ from cairn.models import (
     ExternalDataSource,
     ExternalDataUseMode,
     LawfulBasisRecord,
+    LIADecision,
+    LIARLIRecord,
     PersonalDataCategory,
     ProcessingActivity,
     RegimeScope,
@@ -23,11 +25,22 @@ def make_statutory_activity(session, actor, art6_code):
         owner_id=actor.id,
         next_review_at=date(2026, 12, 1),
     )
-    activity.basis_records.append(
-        LawfulBasisRecord(regime_scope=RegimeScope.PART2, art6_basis=art6(session, art6_code))
-    )
+    basis = LawfulBasisRecord(regime_scope=RegimeScope.PART2, art6_basis=art6(session, art6_code))
+    activity.basis_records.append(basis)
     session.add(activity)
     session.flush()
+    if art6_code == "f":
+        session.add(
+            LIARLIRecord(
+                lawful_basis_record_id=basis.id,
+                interest_identified="Community fire-safety engagement.",
+                necessity_test="Necessary to target at-risk households.",
+                balancing_test="Impact on individuals is minimal and proportionate.",
+                decision=LIADecision.PROCEED,
+                decision_date=date(2026, 6, 1),
+            )
+        )
+        session.flush()
     return activity
 
 

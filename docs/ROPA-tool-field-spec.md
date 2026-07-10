@@ -167,6 +167,7 @@ Each is a managed controlled vocabulary. Common shape: `id`, `label`, plus the a
 | `activity_datasource` | Processing Activity | External Data Source | activity-level lineage baseline |
 | `activity_retention` | Processing Activity *(or data category)* | Retention Rule | `data_category_scope` fk (optional); overrides system default (Plan §3.9) |
 | `activity_feeds` | Processing Activity *(analytics_modelling)* | Processing Activity *(operational)* | directional: source → consumer |
+| `activity_controller` | Processing Activity *(processor/joint)* | Legal Entity | **[spec clarification]** the "each controller acted for" link the Art 30(2) view (§10.2) and rule 13 require; §9.3's `controllers` field — previously implied but missing from this table |
 
 ---
 

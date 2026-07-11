@@ -15,6 +15,7 @@ from cairn.regime_policy import router as regime_policy_router
 from cairn.registers import router as registers_router
 from cairn.settings import get_settings
 from cairn.setup import router as setup_router
+from cairn.users import router as users_router
 from cairn.vocabularies import router as vocabularies_router
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(basis_router)
     app.include_router(registers_router)
     app.include_router(activities_router)
+    app.include_router(users_router)
 
     return app
 

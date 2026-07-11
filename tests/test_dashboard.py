@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cairn.models import (
@@ -10,7 +11,7 @@ from cairn.models import (
     Regime,
     ScreeningOutcome,
 )
-from test_activities import _business_function_id, _login, _user_id
+from test_activities import _business_function_id, _extract_csrf, _login, _user_id
 
 
 def _seed_dashboard_activities(engine) -> None:
@@ -123,3 +124,31 @@ def test_register_requires_login(activities_client):
     response = activities_client.get("/register")
     assert response.status_code == 302
     assert response.headers["location"] == "/login"
+
+
+def test_mark_reviewed_removes_activity_from_overdue_dashboard(
+    activities_client, activities_web_engine
+):
+    _seed_dashboard_activities(activities_web_engine)
+    with Session(activities_web_engine) as db:
+        activity_id = db.scalars(
+            select(ProcessingActivity).where(
+                ProcessingActivity.name == "Overdue Review Activity"
+            )
+        ).one().id
+
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    before = activities_client.get("/")
+    assert "Overdue Review Activity" in before.text
+
+    detail_page = activities_client.get(f"/activities/{activity_id}")
+    token = _extract_csrf(detail_page.text)
+    future = (date.today() + timedelta(days=90)).isoformat()
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": future},
+    )
+    assert response.status_code == 302
+
+    after = activities_client.get("/")
+    assert "Overdue Review Activity" not in after.text

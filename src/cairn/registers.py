@@ -109,7 +109,9 @@ def _validate_required_fk(
 
 def _approver_dpo_options(session: Session) -> list[tuple[str, str]]:
     users = session.scalars(
-        select(User).where(User.role == Role.APPROVER_DPO).order_by(User.display_name)
+        select(User)
+        .where(User.role == Role.APPROVER_DPO, User.is_active)
+        .order_by(User.display_name)
     ).all()
     return [("", "Not set")] + [(u.id, u.display_name) for u in users]
 

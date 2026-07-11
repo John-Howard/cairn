@@ -8,9 +8,12 @@ from cairn.models import (
     ActivityDomain,
     AuditEvent,
     DataSubjectCategory,
+    EntryStatus,
     LawfulBasisRecord,
     PersonalDataCategory,
     ProcessingActivity,
+    Recipient,
+    RecipientType,
     RecordStatus,
     RecordVersion,
     Regime,
@@ -485,3 +488,120 @@ def test_regime_override(activities_client, activities_web_engine):
         },
     )
     assert curator_attempt.status_code == 403
+
+
+def test_picker_options_show_proposed_and_exclude_rejected(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    with Session(activities_web_engine) as db:
+        db.add_all(
+            [
+                Recipient(
+                    label="Proposed Picker Recipient",
+                    type=RecipientType.PUBLIC_BODY,
+                    entry_status=EntryStatus.PROPOSED,
+                ),
+                Recipient(
+                    label="Rejected Picker Recipient",
+                    type=RecipientType.PUBLIC_BODY,
+                    entry_status=EntryStatus.REJECTED,
+                ),
+            ]
+        )
+        db.commit()
+
+    detail = activities_client.get(f"/activities/{activity_id}")
+    assert "Proposed Picker Recipient (proposed)" in detail.text
+    assert "Rejected Picker Recipient" not in detail.text
+
+
+def test_add_recipient_rejects_rejected_entry(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    with Session(activities_web_engine) as db:
+        rejected = Recipient(
+            label="Rejected Add Recipient",
+            type=RecipientType.PUBLIC_BODY,
+            entry_status=EntryStatus.REJECTED,
+        )
+        db.add(rejected)
+        db.commit()
+        rejected_id = rejected.id
+
+    token = _token(activities_client)
+    response = activities_client.post(
+        f"/activities/{activity_id}/recipients",
+        data={"csrf_token": token, "item_id": rejected_id},
+    )
+    assert response.status_code == 422
+
+
+def test_activation_gate_blocks_on_unapproved_reference(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    token = _token(activities_client)
+
+    with Session(activities_web_engine) as db:
+        proposed = Recipient(
+            label="Gate Recipient",
+            type=RecipientType.PUBLIC_BODY,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        db.add(proposed)
+        db.commit()
+        proposed_id = proposed.id
+
+    add_recipient = activities_client.post(
+        f"/activities/{activity_id}/recipients",
+        data={"csrf_token": token, "item_id": proposed_id},
+    )
+    assert add_recipient.status_code == 302
+
+    to_review = activities_client.post(
+        f"/activities/{activity_id}/status",
+        data={"csrf_token": token, "target_status": "in_review"},
+    )
+    assert to_review.status_code == 302
+
+    approver_id = _user_id(activities_web_engine, "Ada Approver")
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = approver_id
+        db.add(
+            LawfulBasisRecord(
+                activity_id=activity_id,
+                regime_scope=RegimeScope.PART2,
+                art6_basis=art6(db, "e"),
+                art6_justification="Statutory community fire safety function.",
+            )
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    approver_token = _token(activities_client)
+    blocked = activities_client.post(
+        f"/activities/{activity_id}/status",
+        data={"csrf_token": approver_token, "target_status": "active"},
+    )
+    assert blocked.status_code == 422
+    assert "not approved" in blocked.text.lower()
+
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = approver_id
+        recipient = db.get(Recipient, proposed_id)
+        recipient.entry_status = EntryStatus.APPROVED
+        db.commit()
+
+    activated = activities_client.post(
+        f"/activities/{activity_id}/status",
+        data={"csrf_token": approver_token, "target_status": "active"},
+    )
+    assert activated.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.record_status == RecordStatus.ACTIVE

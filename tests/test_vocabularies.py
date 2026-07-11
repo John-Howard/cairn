@@ -2,7 +2,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cairn.models import (
+    AuditEvent,
     BusinessFunction,
+    EntryStatus,
     LawfulBasisGeneral,
     LegalEntity,
     PersonalDataCategory,
@@ -283,3 +285,173 @@ def test_fk_field_round_trip(activities_client, activities_web_engine):
         },
     )
     assert invalid.status_code == 422
+
+
+def test_contributor_can_propose_recipient(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    new_page = activities_client.get("/vocabularies/recipients/new")
+    assert new_page.status_code == 200
+    token = _extract_csrf(new_page.text)
+
+    created = activities_client.post(
+        "/vocabularies/recipients",
+        data={
+            "csrf_token": token,
+            "label": "Proposed Recipient",
+            "type": "public_body",
+            "legal_entity_id": "",
+        },
+    )
+    assert created.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        entry = db.scalars(
+            select(Recipient).where(Recipient.label == "Proposed Recipient")
+        ).one()
+        assert entry.entry_status == EntryStatus.PROPOSED
+
+
+def test_curator_created_recipient_is_approved(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _vocab_token(activities_client)
+    created = activities_client.post(
+        "/vocabularies/recipients",
+        data={
+            "csrf_token": token,
+            "label": "Curator Recipient",
+            "type": "public_body",
+            "legal_entity_id": "",
+        },
+    )
+    assert created.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        entry = db.scalars(
+            select(Recipient).where(Recipient.label == "Curator Recipient")
+        ).one()
+        assert entry.entry_status == EntryStatus.APPROVED
+
+
+def test_contributor_cannot_propose_to_non_proposal_vocab(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    token = _vocab_token(activities_client)
+    assert activities_client.get("/vocabularies/legal-entities/new").status_code == 403
+    response = activities_client.post(
+        "/vocabularies/legal-entities",
+        data={"csrf_token": token, "label": "Nope", "role_type": "partner_agency"},
+    )
+    assert response.status_code == 403
+
+
+def test_contributor_cannot_edit_proposal_vocab_entry(activities_client, activities_web_engine):
+    with Session(activities_web_engine) as db:
+        recipient_id = db.scalars(select(Recipient)).first().id
+
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    assert (
+        activities_client.get(f"/vocabularies/recipients/{recipient_id}/edit").status_code == 403
+    )
+
+
+def test_viewer_cannot_propose(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    token = _vocab_token(activities_client)
+    assert activities_client.get("/vocabularies/recipients/new").status_code == 403
+    response = activities_client.post(
+        "/vocabularies/recipients",
+        data={"csrf_token": token, "label": "Nope", "type": "public_body", "legal_entity_id": ""},
+    )
+    assert response.status_code == 403
+
+
+def test_approve_and_reject_flow(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    token = _vocab_token(activities_client)
+    activities_client.post(
+        "/vocabularies/recipients",
+        data={
+            "csrf_token": token,
+            "label": "Flow Recipient",
+            "type": "public_body",
+            "legal_entity_id": "",
+        },
+    )
+    activities_client.post(
+        "/vocabularies/recipients",
+        data={
+            "csrf_token": token,
+            "label": "Flow Recipient Two",
+            "type": "public_body",
+            "legal_entity_id": "",
+        },
+    )
+
+    with Session(activities_web_engine) as db:
+        approve_id = db.scalars(
+            select(Recipient).where(Recipient.label == "Flow Recipient")
+        ).one().id
+        reject_id = db.scalars(
+            select(Recipient).where(Recipient.label == "Flow Recipient Two")
+        ).one().id
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _vocab_token(activities_client)
+
+    approved = activities_client.post(
+        f"/vocabularies/recipients/{approve_id}/approve", data={"csrf_token": token}
+    )
+    assert approved.status_code == 302
+
+    rejected = activities_client.post(
+        f"/vocabularies/recipients/{reject_id}/reject",
+        data={"csrf_token": token, "reason": "Duplicate of an existing recipient"},
+    )
+    assert rejected.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        approved_entry = db.get(Recipient, approve_id)
+        assert approved_entry.entry_status == EntryStatus.APPROVED
+        approve_event = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_type == "recipient",
+                AuditEvent.entity_id == approve_id,
+                AuditEvent.event == "vocab_approved",
+            )
+        ).one()
+        assert approve_event.actor_id is not None
+
+        rejected_entry = db.get(Recipient, reject_id)
+        assert rejected_entry.entry_status == EntryStatus.REJECTED
+        reject_event = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_type == "recipient",
+                AuditEvent.entity_id == reject_id,
+                AuditEvent.event == "vocab_rejected",
+            )
+        ).one()
+        assert reject_event.reason == "Duplicate of an existing recipient"
+
+    already_approved = activities_client.post(
+        f"/vocabularies/recipients/{approve_id}/approve", data={"csrf_token": token}
+    )
+    assert already_approved.status_code == 422
+
+
+def test_approve_reject_404_on_non_proposal_vocab(activities_client, activities_web_engine):
+    with Session(activities_web_engine) as db:
+        entity_id = db.scalars(select(BusinessFunction)).first().id
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _vocab_token(activities_client)
+    assert (
+        activities_client.post(
+            f"/vocabularies/business-functions/{entity_id}/approve", data={"csrf_token": token}
+        ).status_code
+        == 404
+    )
+    assert (
+        activities_client.post(
+            f"/vocabularies/business-functions/{entity_id}/reject", data={"csrf_token": token}
+        ).status_code
+        == 404
+    )

@@ -17,6 +17,7 @@ from cairn.models import (
     ContractDSA,
     ContractType,
     DecisionSupportADM,
+    EntryStatus,
     ExternalDataSource,
     ExternalDataUseMode,
     LegalEntity,
@@ -66,7 +67,10 @@ ADM_USE_MODE_LABELS = {ADMUseMode.MANUAL: "Manual", ADMUseMode.AUTOMATED: "Autom
 
 
 def _display_label(obj) -> str:
-    return getattr(obj, "label", None) or getattr(obj, "name", None) or str(obj.id)
+    label = getattr(obj, "label", None) or getattr(obj, "name", None) or str(obj.id)
+    if getattr(obj, "entry_status", None) == EntryStatus.PROPOSED:
+        return f"{label} (proposed)"
+    return label
 
 
 def _get_activity(session: Session, activity_id: str) -> ProcessingActivity:
@@ -1129,6 +1133,8 @@ async def retention_add(
     rule = session.get(RetentionRule, rule_id) if rule_id else None
     if rule is None:
         raise HTTPException(status_code=422, detail="Select a retention rule")
+    if rule.entry_status == EntryStatus.REJECTED:
+        raise HTTPException(status_code=422, detail="This entry has been rejected")
     scope_id = form.get("data_category_scope_id") or None
     if scope_id and scope_id not in {c.id for c in activity.data_categories}:
         raise HTTPException(
@@ -1186,6 +1192,8 @@ async def security_add(
     measure = session.get(SecurityMeasure, measure_id) if measure_id else None
     if measure is None:
         raise HTTPException(status_code=422, detail="Select a security measure")
+    if measure.entry_status == EntryStatus.REJECTED:
+        raise HTTPException(status_code=422, detail="This entry has been rejected")
     existing = session.scalars(
         select(ActivitySecurity).where(
             ActivitySecurity.activity_id == activity.id,
@@ -1348,7 +1356,11 @@ def register_detail_context(session: Session, activity: ProcessingActivity, user
             }
             for link in activity.retention_links
         ],
-        "retention_rule_options": [(r.id, _display_label(r)) for r in all_retention_rules],
+        "retention_rule_options": [
+            (r.id, _display_label(r))
+            for r in all_retention_rules
+            if r.entry_status != EntryStatus.REJECTED
+        ],
         "retention_scope_options": [(c.id, _display_label(c)) for c in activity.data_categories],
         "retention_suggestions": _retention_suggestions(activity, retention_rule_labels),
         "security_inherited_rows": [
@@ -1370,6 +1382,6 @@ def register_detail_context(session: Session, activity: ProcessingActivity, user
         "security_measure_options": [
             (m.id, _display_label(m))
             for m in all_security_measures
-            if m.id not in linked_security_ids
+            if m.id not in linked_security_ids and m.entry_status != EntryStatus.REJECTED
         ],
     }

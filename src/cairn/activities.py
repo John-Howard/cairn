@@ -20,6 +20,7 @@ from cairn.models import (
     BusinessFunction,
     ControllerOrProcessor,
     DataSubjectCategory,
+    EntryStatus,
     ExternalDataSource,
     ExternalDataUseMode,
     LEClassification,
@@ -171,12 +172,15 @@ JUNCTION_CONTEXT_KEYS = {
 
 
 def _display_label(obj) -> str:
-    return (
+    label = (
         getattr(obj, "label", None)
         or getattr(obj, "name", None)
         or getattr(obj, "notice_version", None)
         or str(obj.id)
     )
+    if getattr(obj, "entry_status", None) == EntryStatus.PROPOSED:
+        return f"{label} (proposed)"
+    return label
 
 
 def _get_activity(session: Session, activity_id: str) -> ProcessingActivity:
@@ -229,7 +233,12 @@ def _available_options(
     session: Session, model: type, linked_ids: set[str]
 ) -> list[tuple[str, str]]:
     items = session.scalars(select(model)).all()
-    return [(item.id, _display_label(item)) for item in items if item.id not in linked_ids]
+    return [
+        (item.id, _display_label(item))
+        for item in items
+        if item.id not in linked_ids
+        and getattr(item, "entry_status", None) != EntryStatus.REJECTED
+    ]
 
 
 def _parse_activity_form(form) -> dict:
@@ -856,6 +865,8 @@ async def add_data_category(
     category = session.get(PersonalDataCategory, category_id) if category_id else None
     if category is None:
         raise HTTPException(status_code=422, detail="Select a personal data category")
+    if category.entry_status == EntryStatus.REJECTED:
+        raise HTTPException(status_code=422, detail="This entry has been rejected")
     scope_id = form.get("data_subject_scope_id") or None
     if scope_id and scope_id not in {s.id for s in activity.data_subjects}:
         raise HTTPException(
@@ -916,6 +927,8 @@ async def add_simple_junction(
     item = session.get(junction.model, item_id) if item_id else None
     if item is None:
         raise HTTPException(status_code=422, detail=f"Select a {junction.label}")
+    if getattr(item, "entry_status", None) == EntryStatus.REJECTED:
+        raise HTTPException(status_code=422, detail="This entry has been rejected")
     collection = getattr(activity, junction.attr)
     if item not in collection:
         collection.append(item)

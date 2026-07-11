@@ -23,6 +23,8 @@ from cairn.models.vocab import (
     LegalEntity,
     PersonalDataCategory,
     Recipient,
+    RetentionRule,
+    SecurityMeasure,
     SystemAsset,
 )
 
@@ -203,6 +205,7 @@ class ActivitySecurity(AuditedBase):
     inherited_from_system: Mapped[bool] = mapped_column(default=False)
 
     activity: Mapped[ProcessingActivity] = relationship(back_populates="security_links")
+    measure: Mapped[SecurityMeasure] = relationship()
 
 
 class ActivityRetention(AuditedBase):
@@ -218,6 +221,7 @@ class ActivityRetention(AuditedBase):
     )
 
     activity: Mapped[ProcessingActivity] = relationship(back_populates="retention_links")
+    rule: Mapped[RetentionRule] = relationship()
 
 
 class ActivityFeeds(AuditedBase):

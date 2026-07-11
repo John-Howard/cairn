@@ -7,6 +7,7 @@ from cairn.models import (
     AgeCheckOutcome,
     ContractType,
     ControllerOrProcessor,
+    EntryStatus,
     ExternalDataUseMode,
     LifecycleStage,
     LineageGranularity,
@@ -270,6 +271,26 @@ def _trial_requirements(activity: ProcessingActivity) -> str | None:
     return None
 
 
+def _no_unapproved_references(activity: ProcessingActivity) -> str | None:
+    entries = [
+        *activity.data_subjects,
+        *activity.recipients,
+        *activity.systems,
+        *activity.data_sources,
+        *(link.category for link in activity.data_category_links),
+        *(link.rule for link in activity.retention_links),
+        *(link.measure for link in activity.security_links),
+    ]
+    labels = {
+        getattr(entry, "label", None) or getattr(entry, "name", None) or str(entry.id)
+        for entry in entries
+        if getattr(entry, "entry_status", None) in (EntryStatus.PROPOSED, EntryStatus.REJECTED)
+    }
+    if labels:
+        return f"References vocabulary entries that are not approved: {', '.join(sorted(labels))}"
+    return None
+
+
 REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "active_sensitive_condition": _sensitive_condition,
     "art10_basis_present": _art10_present,
@@ -285,6 +306,7 @@ REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "analytics_modelling_requirements": _analytics_modelling_requirements,
     "transfer_safeguards_test_present": _transfer_safeguards_test_present,
     "trial_requirements": _trial_requirements,
+    "no_unapproved_references": _no_unapproved_references,
 }
 
 
@@ -394,6 +416,13 @@ RULES: list[Rule] = [
         severity=Severity.BLOCK,
         trigger="is_trial",
         requirement="trial_requirements",
+    ),
+    Rule(
+        id="18",
+        description="Activities must not reference unapproved vocabulary entries",
+        severity=Severity.BLOCK,
+        trigger="always",
+        requirement="no_unapproved_references",
     ),
 ]
 

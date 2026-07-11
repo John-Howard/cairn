@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from cairn.models.base import AuditedBase, Base
 from cairn.models.enums import (
     AdequacyStatus,
+    EntryStatus,
     LEClassification,
     LegalEntityRoleType,
     RecipientType,
@@ -11,6 +12,10 @@ from cairn.models.enums import (
     SourceSpecialCategory,
     SupplierRole,
 )
+
+
+class ProposableMixin:
+    entry_status: Mapped[EntryStatus] = mapped_column(default=EntryStatus.APPROVED)
 
 
 class LegalEntity(AuditedBase):
@@ -29,14 +34,14 @@ class BusinessFunction(AuditedBase):
     label: Mapped[str]
 
 
-class DataSubjectCategory(AuditedBase):
+class DataSubjectCategory(ProposableMixin, AuditedBase):
     __tablename__ = "data_subject_category"
 
     label: Mapped[str]
     le_classification: Mapped[LEClassification] = mapped_column(default=LEClassification.NONE)
 
 
-class PersonalDataCategory(AuditedBase):
+class PersonalDataCategory(ProposableMixin, AuditedBase):
     __tablename__ = "personal_data_category"
 
     label: Mapped[str]
@@ -44,7 +49,7 @@ class PersonalDataCategory(AuditedBase):
     is_criminal_offence: Mapped[bool] = mapped_column(default=False)
 
 
-class Recipient(AuditedBase):
+class Recipient(ProposableMixin, AuditedBase):
     __tablename__ = "recipient"
 
     label: Mapped[str]
@@ -92,14 +97,14 @@ class Schedule8Condition(AuditedBase):
     label: Mapped[str]
 
 
-class SecurityMeasure(AuditedBase):
+class SecurityMeasure(ProposableMixin, AuditedBase):
     __tablename__ = "security_measure"
 
     label: Mapped[str]
     category: Mapped[SecurityMeasureCategory]
 
 
-class RetentionRule(AuditedBase):
+class RetentionRule(ProposableMixin, AuditedBase):
     __tablename__ = "retention_rule"
 
     label: Mapped[str]
@@ -117,7 +122,7 @@ system_securitymeasure = Table(
 )
 
 
-class SystemAsset(AuditedBase):
+class SystemAsset(ProposableMixin, AuditedBase):
     __tablename__ = "system_asset"
 
     label: Mapped[str]
@@ -154,7 +159,7 @@ externaldatasource_datacategory = Table(
 )
 
 
-class ExternalDataSource(AuditedBase):
+class ExternalDataSource(ProposableMixin, AuditedBase):
     __tablename__ = "external_data_source"
 
     name: Mapped[str]

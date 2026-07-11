@@ -10,6 +10,7 @@ from cairn.activities import router as activities_router
 from cairn.auth import LoginRequired
 from cairn.auth import router as auth_router
 from cairn.basis import router as basis_router
+from cairn.complaints import router as complaints_router
 from cairn.dashboard import router as dashboard_router
 from cairn.imports import router as imports_router
 from cairn.regime_policy import router as regime_policy_router
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(activities_router)
     app.include_router(imports_router)
     app.include_router(users_router)
+    app.include_router(complaints_router)
 
     return app
 

@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session
 from cairn.activities import RECORD_STATUS_LABELS, REGIME_LABELS
 from cairn.audit import record_event
 from cairn.auth import current_user, get_csrf_token
+from cairn.complaints import complaint_status
 from cairn.db import get_session
 from cairn.export import EXPORT_VIEWS, build_export_context, export_views, render_csv
 from cairn.models import (
     BusinessFunction,
+    ComplaintRecord,
     LifecycleStage,
     OrganisationProfile,
     ProcessingActivity,
@@ -111,6 +113,15 @@ def dashboard(
     ]
     export_coverage.append(("Combined internal register", "combined", len(activities)))
 
+    open_complaints = session.scalars(
+        select(ComplaintRecord).where(ComplaintRecord.responded_at.is_(None))
+    ).all()
+    complaints_attention = []
+    for complaint in open_complaints:
+        label, colour = complaint_status(complaint, today)
+        if colour in ("red", "yellow"):
+            complaints_attention.append((complaint, label, colour))
+
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -135,6 +146,8 @@ def dashboard(
             "pending_proposals": pending_proposals_count(session),
             "export_coverage": export_coverage,
             "function_labels": function_labels,
+            "open_complaints_count": len(open_complaints),
+            "complaints_attention": complaints_attention,
             "csrf_token": get_csrf_token(request),
         },
     )

@@ -51,8 +51,8 @@ flowchart TD
     subgraph services["Service layer"]
         REG["Regime operations<br/>(policy cascade, override)<br/><i>regime.py</i>"]
         RULES["Profile-conditioned rule engine<br/><i>rules.py</i>"]
-        EXPORT["Export mapping layer<br/>Art 30(1)/(2) · s61 · combined<br/><i>export.py → 2e</i>"]
-        WF["Workflow & questionnaire ingestion<br/><i>(2d, not yet built)</i>"]
+        EXPORT["Export mapping layer<br/>Art 30(1)/(2) · s61 · combined<br/><i>export.py</i>"]
+        WF["Workflow & questionnaire ingestion<br/><i>vocabularies.py · imports.py · complaints.py</i>"]
     end
     subgraph domain["Domain & persistence"]
         MODELS["Entity model + junctions<br/><i>models/</i>"]
@@ -66,7 +66,7 @@ flowchart TD
     domain --> DB
 ```
 
-- The **service layer is where sub-phases 2a–2e accrete**; the domain layer is substantially built (Phase 1.2).
+- The **service layer accreted through sub-phases 2a–2f** (all built); the domain layer was built in Phase 1.2.
 - The four configuration layers from the Plan (universal core → Organisation Profile → sector pack → profile-conditioned rules) are **data and seed concerns, not deployment concerns** — one container image serves every profile.
 - The **export mapping layer stays configuration-driven** (Spec §10): views are generated, never stored.
 

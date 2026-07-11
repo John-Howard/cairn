@@ -5,8 +5,11 @@ from sqlalchemy.orm import Session
 
 from cairn.models import (
     DPIA,
+    EntryStatus,
     LifecycleStage,
     ProcessingActivity,
+    Recipient,
+    RecipientType,
     RecordStatus,
     Regime,
     ScreeningOutcome,
@@ -101,6 +104,88 @@ def test_dashboard_empty_state(activities_client, activities_web_engine):
     assert "0 processing activities recorded" in response.text
     assert "No overdue reviews" in response.text
     assert "No trials ending within 60 days" in response.text
+    assert ">—<" in response.text
+
+
+def test_dashboard_review_compliance_and_blocked(activities_client, activities_web_engine):
+    _seed_dashboard_activities(activities_web_engine)
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = _user_id(activities_web_engine, "Ada Approver")
+        overdue = db.scalars(
+            select(ProcessingActivity).where(
+                ProcessingActivity.name == "Overdue Review Activity"
+            )
+        ).one()
+        overdue.vulnerable_or_safeguarding_flag = True
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "67%" in response.text
+    assert "4 blocking" in response.text
+    assert "0 warning" in response.text
+    marker = ">Activities blocked from approval</td>"
+    start = response.text.index(marker) + len(marker)
+    row_tail = response.text[start : start + 200]
+    assert '--numeric">3</td>' in row_tail
+
+
+def test_dashboard_review_compliance_full(activities_client, activities_web_engine):
+    approver_id = _user_id(activities_web_engine, "Ada Approver")
+    function_id = _business_function_id(activities_web_engine, "Prevention & Community Safety")
+    today = date.today()
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = approver_id
+        db.add(
+            ProcessingActivity(
+                name="On Time Activity",
+                business_function_id=function_id,
+                purpose="Purpose",
+                personal_data_source=["from_data_subject"],
+                owner_id=approver_id,
+                next_review_at=today + timedelta(days=200),
+                record_status=RecordStatus.ACTIVE,
+            )
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "100%" in response.text
+
+
+def test_dashboard_pending_proposals(activities_client, activities_web_engine):
+    approver_id = _user_id(activities_web_engine, "Ada Approver")
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = approver_id
+        db.add(
+            Recipient(
+                label="Proposed Recipient",
+                type=RecipientType.OTHER,
+                entry_status=EntryStatus.PROPOSED,
+            )
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Pending vocabulary proposals" in response.text
+    assert '<a class="govuk-link" href="/vocabularies">1</a>' in response.text
+
+
+def test_dashboard_export_coverage(activities_client, activities_web_engine):
+    _seed_dashboard_activities(activities_web_engine)
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Art 30(1)" in response.text
+    assert "DPA 2018 s61" in response.text
+    assert "Combined internal register" in response.text
+    assert '/register/export/art30_1">Download CSV</a>' in response.text
+    assert '/register/export/combined">Download CSV</a>' in response.text
 
 
 def test_register_lists_all_activities_for_viewer(activities_client, activities_web_engine):

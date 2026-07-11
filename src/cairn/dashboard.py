@@ -21,6 +21,7 @@ from cairn.models import (
 )
 from cairn.rules import Severity, evaluate
 from cairn.templating import templates
+from cairn.vocabularies import pending_proposals_count
 
 router = APIRouter()
 
@@ -80,12 +81,35 @@ def dashboard(
 
     block_count = 0
     warn_count = 0
+    blocked_activities = 0
     for activity in non_retired:
+        activity_blocked = False
         for finding in evaluate(activity, profile):
             if finding.severity == Severity.BLOCK:
                 block_count += 1
+                activity_blocked = True
             else:
                 warn_count += 1
+        if activity_blocked:
+            blocked_activities += 1
+
+    review_compliance = (
+        round(100 * (len(non_retired) - len(overdue)) / len(non_retired))
+        if non_retired
+        else None
+    )
+
+    show_s61 = Regime.LAW_ENFORCEMENT in profile.applicable_regimes
+    export_keys = ["art30_1", "art30_2", *(["s61"] if show_s61 else [])]
+    export_coverage = [
+        (
+            EXPORT_VIEWS[key].title,
+            key,
+            sum(1 for a in activities if EXPORT_VIEWS[key].include(a, profile)),
+        )
+        for key in export_keys
+    ]
+    export_coverage.append(("Combined internal register", "combined", len(activities)))
 
     return templates.TemplateResponse(
         request,
@@ -106,6 +130,10 @@ def dashboard(
             "today": today,
             "block_count": block_count,
             "warn_count": warn_count,
+            "blocked_activities": blocked_activities,
+            "review_compliance": review_compliance,
+            "pending_proposals": pending_proposals_count(session),
+            "export_coverage": export_coverage,
             "function_labels": function_labels,
             "csrf_token": get_csrf_token(request),
         },

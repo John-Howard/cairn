@@ -514,6 +514,20 @@ def _vocab_form_context(
     }
 
 
+def _pending_count(session: Session, spec: VocabSpec) -> int:
+    if not spec.accepts_proposals:
+        return 0
+    return session.scalar(
+        select(func.count())
+        .select_from(spec.model)
+        .where(spec.model.entry_status == EntryStatus.PROPOSED)
+    )
+
+
+def pending_proposals_count(session: Session) -> int:
+    return sum(_pending_count(session, spec) for spec in VOCABULARIES.values())
+
+
 @router.get("/vocabularies")
 def vocab_index(
     request: Request, user: User = Depends(current_user), session: Session = Depends(get_session)
@@ -524,15 +538,7 @@ def vocab_index(
             "display_name": spec.display_name,
             "editable": spec.editable,
             "count": session.scalar(select(func.count()).select_from(spec.model)),
-            "pending_count": (
-                session.scalar(
-                    select(func.count())
-                    .select_from(spec.model)
-                    .where(spec.model.entry_status == EntryStatus.PROPOSED)
-                )
-                if spec.accepts_proposals
-                else 0
-            ),
+            "pending_count": _pending_count(session, spec),
         }
         for spec in VOCABULARIES.values()
     ]

@@ -68,6 +68,43 @@
   <strong class="govuk-tag govuk-tag--yellow">{{ warn_count }} warning</strong>
 </p>
 
+<h2 class="govuk-heading-m">Assurance &amp; export</h2>
+<table class="govuk-table">
+  <tbody class="govuk-table__body">
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Review compliance</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ review_compliance ~ "%" if review_compliance is not none else "—" }}</td>
+    </tr>
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Pending vocabulary proposals</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/vocabularies">{{ pending_proposals }}</a></td>
+    </tr>
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Activities blocked from approval</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ blocked_activities }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">View</th>
+      <th scope="col" class="govuk-table__header">Active activities</th>
+      <th scope="col" class="govuk-table__header">Download</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for title, key, count in export_coverage %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ title }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ count }}</td>
+      <td class="govuk-table__cell"><a class="govuk-link" href="/register/export/{{ key }}">Download CSV</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 <h2 class="govuk-heading-m">Overdue reviews</h2>
 {% if overdue %}
 <table class="govuk-table">

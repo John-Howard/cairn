@@ -39,6 +39,11 @@ REGIME_LABELS = {
     Regime.LAW_ENFORCEMENT: "Law enforcement (DPA 2018 Part 3)",
 }
 
+COMMENCEMENT_WATCH = {
+    "duaa_principal": "2026-02-05",
+    "s164a_complaints": "2026-06-19",
+}
+
 
 def _guard(session: Session) -> None:
     existing = session.scalars(select(OrganisationProfile)).first()
@@ -88,6 +93,7 @@ async def setup_submit(request: Request, session: Session = Depends(get_session)
         applicable_regimes=sorted(applicable_regimes),
         active_modules=sorted(active_modules),
         public_authority_guards=public_authority_guards,
+        commencement_watch=COMMENCEMENT_WATCH,
     )
     session.add(profile)
     session.flush()

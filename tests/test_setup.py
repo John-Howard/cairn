@@ -9,6 +9,7 @@ from cairn.models import (
     Role,
     User,
 )
+from cairn.setup import COMMENCEMENT_WATCH
 
 
 def test_anonymous_home_redirects_to_login(client):
@@ -49,6 +50,7 @@ def test_setup_creates_profile_seeds_and_bootstrap_user(client, web_engine):
         assert set(profile.applicable_regimes) == {"general", "law_enforcement"}
         assert "complaints" in profile.active_modules
         assert "dpia" in profile.active_modules
+        assert profile.commencement_watch == COMMENCEMENT_WATCH
 
         art6_count = db.scalar(select(func.count()).select_from(LawfulBasisGeneral))
         assert art6_count == 7

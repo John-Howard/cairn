@@ -97,6 +97,8 @@
   <li>Criminal offence: {{ "Yes" if activity.criminal_offence_flag else "No" }}</li>
   <li>Vulnerable / safeguarding: {{ "Yes" if activity.vulnerable_or_safeguarding_flag else "No" }}</li>
   <li>Children: {{ "Yes" if activity.children_flag else "No" }}</li>
+  <li>Online children's service: {{ "Yes" if activity.online_childrens_service_flag else "No" }}</li>
+  <li>Further processing: {{ "Yes" if activity.is_further_processing else "No" }}</li>
   <li>High risk: {{ "Yes" if activity.high_risk_flag else "No" }}</li>
   <li>ADM / profiling: {{ "Yes" if activity.adm_profiling_flag else "No" }}</li>
 </ul>

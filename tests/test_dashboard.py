@@ -7,6 +7,7 @@ from cairn.models import (
     DPIA,
     EntryStatus,
     LifecycleStage,
+    OrganisationProfile,
     ProcessingActivity,
     Recipient,
     RecipientType,
@@ -186,6 +187,34 @@ def test_dashboard_export_coverage(activities_client, activities_web_engine):
     assert "Combined internal register" in response.text
     assert '/register/export/art30_1">Download CSV</a>' in response.text
     assert '/register/export/combined">Download CSV</a>' in response.text
+
+
+def test_dashboard_no_commencement_watch_card_without_data(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "DUAA commencement" not in response.text
+
+
+def test_dashboard_commencement_watch_card(activities_client, activities_web_engine):
+    approver_id = _user_id(activities_web_engine, "Ada Approver")
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = approver_id
+        profile = db.scalars(select(OrganisationProfile)).one()
+        profile.commencement_watch = {
+            "duaa_principal": "2026-02-05",
+            "s164a_complaints": "2026-06-19",
+        }
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "DUAA commencement" in response.text
+    assert "in force since 2026-02-05" in response.text
+    assert "in force since 2026-06-19" in response.text
 
 
 def test_register_lists_all_activities_for_viewer(activities_client, activities_web_engine):

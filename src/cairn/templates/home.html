@@ -64,6 +64,17 @@
   </div>
 </div>
 
+{% if commencement_watch %}
+<div class="govuk-inset-text">
+  <h2 class="govuk-heading-s">DUAA commencement</h2>
+  <ul class="govuk-list">
+    {% for label, commencement_date in commencement_watch %}
+    <li>{{ label }} — in force since {{ commencement_date }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <h2 class="govuk-heading-m">Findings</h2>
 <p class="govuk-body">
   Across non-retired activities:

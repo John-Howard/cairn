@@ -1,20 +1,22 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cairn.activities import RECORD_STATUS_LABELS, REGIME_LABELS
+from cairn.audit import record_event
 from cairn.auth import current_user, get_csrf_token
 from cairn.db import get_session
-from cairn.export import export_views
+from cairn.export import EXPORT_VIEWS, build_export_context, export_views, render_csv
 from cairn.models import (
     BusinessFunction,
     LifecycleStage,
     OrganisationProfile,
     ProcessingActivity,
     RecordStatus,
+    Regime,
     User,
 )
 from cairn.rules import Severity, evaluate
@@ -141,6 +143,41 @@ def register(
             "rows": rows,
             "record_status_labels": RECORD_STATUS_LABELS,
             "regime_labels": REGIME_LABELS,
+            "show_s61": Regime.LAW_ENFORCEMENT in profile.applicable_regimes,
             "csrf_token": get_csrf_token(request),
         },
+    )
+
+
+@router.get("/register/export/{view_key}")
+def register_export(
+    view_key: str,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    profile = session.scalars(select(OrganisationProfile)).first()
+    if profile is None:
+        return RedirectResponse("/setup", status_code=302)
+    view = EXPORT_VIEWS.get(view_key)
+    if view is None:
+        raise HTTPException(status_code=404)
+    if view_key == "s61" and Regime.LAW_ENFORCEMENT not in profile.applicable_regimes:
+        raise HTTPException(status_code=404)
+    activities = session.scalars(
+        select(ProcessingActivity).order_by(ProcessingActivity.name)
+    ).all()
+    ctx = build_export_context(session, profile)
+    text, row_count = render_csv(view, activities, ctx)
+    record_event(
+        session,
+        entity=profile,
+        event="register_exported",
+        actor=user,
+        new_value={"view": view_key, "rows": row_count},
+    )
+    filename = f"{view.filename_stem}-{date.today().isoformat()}.csv"
+    return Response(
+        content=text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -24,9 +24,11 @@ from cairn.models.vocab import (
     LawfulBasisGeneral,
     LawfulBasisLE,
     LegalEntity,
+    Recipient,
     Schedule1Condition,
     Schedule8Condition,
     SpecialCategoryCondition,
+    ThirdCountry,
     TransferMechanism,
 )
 
@@ -118,6 +120,8 @@ class Transfer(AuditedBase):
 
     activity: Mapped[ProcessingActivity] = relationship(back_populates="transfers")
     mechanism: Mapped[TransferMechanism] = relationship()
+    recipient: Mapped[Recipient] = relationship()
+    third_country: Mapped[ThirdCountry] = relationship()
 
 
 class DPIA(AuditedBase):

@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from cairn.audit import record_event
 from cairn.auth import current_user, get_csrf_token, verify_csrf
 from cairn.db import get_session
 from cairn.models import (
@@ -14,6 +15,7 @@ from cairn.models import (
     AppropriatePolicyDocument,
     BusinessFunction,
     DataSubjectCategory,
+    EntryStatus,
     ExternalDataSource,
     LawfulBasisGeneral,
     LawfulBasisLE,
@@ -63,6 +65,7 @@ class VocabSpec:
     label_attr: str
     fields: list[VocabField]
     editable: bool = True
+    accepts_proposals: bool = False
 
 
 VOCABULARIES: dict[str, VocabSpec] = {
@@ -80,6 +83,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=DataSubjectCategory,
             display_name="Data subject category",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField(
@@ -97,6 +101,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=PersonalDataCategory,
             display_name="Personal data category",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField("is_special_category", "Special category", "bool"),
@@ -108,6 +113,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=Recipient,
             display_name="Recipient",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField("type", "Type", "enum", required=True, enum_cls=RecipientType),
@@ -121,6 +127,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=SecurityMeasure,
             display_name="Security measure",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField(
@@ -133,6 +140,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=SystemAsset,
             display_name="System / Asset",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField("owner", "Owner", "text"),
@@ -152,6 +160,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=RetentionRule,
             display_name="Retention rule",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField("period", "Period", "text", required=True),
@@ -180,6 +189,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=ExternalDataSource,
             display_name="External data source",
             label_attr="name",
+            accepts_proposals=True,
             fields=[
                 VocabField("name", "Name", "text", required=True),
                 VocabField(
@@ -336,6 +346,14 @@ def _get_editable_spec(key: str) -> VocabSpec:
 def _require_editor(user: User) -> None:
     if user.role not in (Role.CURATOR, Role.APPROVER_DPO):
         raise HTTPException(status_code=403, detail="Not permitted to edit vocabularies")
+
+
+def _require_can_add(user: User, spec: VocabSpec) -> None:
+    if user.role in (Role.CURATOR, Role.APPROVER_DPO):
+        return
+    if user.role == Role.CONTRIBUTOR and spec.accepts_proposals:
+        return
+    raise HTTPException(status_code=403, detail="Not permitted to add entries to this vocabulary")
 
 
 def _fk_maps(session: Session, spec: VocabSpec) -> dict[str, dict[str, str]]:
@@ -506,6 +524,15 @@ def vocab_index(
             "display_name": spec.display_name,
             "editable": spec.editable,
             "count": session.scalar(select(func.count()).select_from(spec.model)),
+            "pending_count": (
+                session.scalar(
+                    select(func.count())
+                    .select_from(spec.model)
+                    .where(spec.model.entry_status == EntryStatus.PROPOSED)
+                )
+                if spec.accepts_proposals
+                else 0
+            ),
         }
         for spec in VOCABULARIES.values()
     ]
@@ -529,10 +556,18 @@ def vocab_list(
     ).all()
     fk_maps = _fk_maps(session, spec)
     rows = [
-        {"id": entry.id, "cells": [_format_value(entry, f, fk_maps) for f in spec.fields]}
+        {
+            "id": entry.id,
+            "cells": [_format_value(entry, f, fk_maps) for f in spec.fields],
+            "entry_status": getattr(entry, "entry_status", None),
+        }
         for entry in entries
     ]
     can_edit = spec.editable and user.role in (Role.CURATOR, Role.APPROVER_DPO)
+    can_moderate = user.role in (Role.CURATOR, Role.APPROVER_DPO)
+    can_add = spec.editable and (
+        can_edit or (spec.accepts_proposals and user.role == Role.CONTRIBUTOR)
+    )
     return templates.TemplateResponse(
         request,
         "vocabularies/list.html",
@@ -542,6 +577,8 @@ def vocab_list(
             "columns": [f.label for f in spec.fields],
             "rows": rows,
             "can_edit": can_edit,
+            "can_add": can_add,
+            "can_moderate": can_moderate,
             "csrf_token": get_csrf_token(request),
         },
     )
@@ -555,7 +592,7 @@ def vocab_new_form(
     session: Session = Depends(get_session),
 ):
     spec = _get_editable_spec(key)
-    _require_editor(user)
+    _require_can_add(user, spec)
     values = _new_values(spec)
     context = _vocab_form_context(
         session,
@@ -577,7 +614,7 @@ async def vocab_create(
     session: Session = Depends(get_session),
 ):
     spec = _get_editable_spec(key)
-    _require_editor(user)
+    _require_can_add(user, spec)
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
     values = _parse_vocab_form(form, spec)
@@ -597,6 +634,8 @@ async def vocab_create(
         )
     entity = spec.model()
     _apply_vocab_values(entity, spec, values)
+    if hasattr(entity, "entry_status") and user.role == Role.CONTRIBUTOR:
+        entity.entry_status = EntryStatus.PROPOSED
     session.add(entity)
     session.flush()
     return RedirectResponse(f"/vocabularies/{key}", status_code=302)
@@ -665,4 +704,57 @@ async def vocab_update(
     if change_note:
         entity.change_note = change_note
     session.flush()
+    return RedirectResponse(f"/vocabularies/{key}", status_code=302)
+
+
+@router.post("/vocabularies/{key}/{entry_id}/approve")
+async def vocab_approve(
+    key: str,
+    entry_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    spec = _get_spec(key)
+    _require_editor(user)
+    if not spec.accepts_proposals:
+        raise HTTPException(status_code=404)
+    entity = session.get(spec.model, entry_id)
+    if entity is None:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if entity.entry_status != EntryStatus.PROPOSED:
+        raise HTTPException(status_code=422, detail="Entry is not pending approval")
+    entity.entry_status = EntryStatus.APPROVED
+    entity.change_note = "Proposal approved"
+    session.flush()
+    record_event(session, entity=entity, event="vocab_approved", actor=user)
+    return RedirectResponse(f"/vocabularies/{key}", status_code=302)
+
+
+@router.post("/vocabularies/{key}/{entry_id}/reject")
+async def vocab_reject(
+    key: str,
+    entry_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    spec = _get_spec(key)
+    _require_editor(user)
+    if not spec.accepts_proposals:
+        raise HTTPException(status_code=404)
+    entity = session.get(spec.model, entry_id)
+    if entity is None:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if entity.entry_status != EntryStatus.PROPOSED:
+        raise HTTPException(status_code=422, detail="Entry is not pending approval")
+    reason = form.get("reason", "").strip() or None
+    entity.entry_status = EntryStatus.REJECTED
+    entity.change_note = "Proposal rejected"
+    session.flush()
+    record_event(session, entity=entity, event="vocab_rejected", actor=user, reason=reason)
     return RedirectResponse(f"/vocabularies/{key}", status_code=302)

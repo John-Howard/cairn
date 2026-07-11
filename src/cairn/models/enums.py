@@ -199,3 +199,9 @@ class ADMUseMode(StrEnum):
 class LIADecision(StrEnum):
     PROCEED = "proceed"
     DO_NOT_PROCEED = "do_not_proceed"
+
+
+class EntryStatus(StrEnum):
+    PROPOSED = "proposed"
+    APPROVED = "approved"
+    REJECTED = "rejected"

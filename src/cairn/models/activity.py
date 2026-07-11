@@ -109,6 +109,8 @@ class ProcessingActivity(AuditedBase):
     trial_end: Mapped[date | None]
     purpose: Mapped[str] = mapped_column(Text)
     categories_of_processing: Mapped[str | None] = mapped_column(Text)
+    is_further_processing: Mapped[bool] = mapped_column(default=False)
+    further_processing_note: Mapped[str | None] = mapped_column(Text)
     personal_data_source: Mapped[list[str]] = mapped_column(JSON)
     is_statutory_task: Mapped[bool] = mapped_column(default=False)
     owner_id: Mapped[str] = mapped_column(ForeignKey("user.id"))
@@ -116,6 +118,8 @@ class ProcessingActivity(AuditedBase):
     next_review_at: Mapped[date]
     vulnerable_or_safeguarding_flag: Mapped[bool] = mapped_column(default=False)
     children_flag: Mapped[bool] = mapped_column(default=False)
+    online_childrens_service_flag: Mapped[bool] = mapped_column(default=False)
+    childrens_matters_note: Mapped[str | None] = mapped_column(Text)
     external_data_use_mode: Mapped[ExternalDataUseMode] = mapped_column(
         default=ExternalDataUseMode.NONE
     )

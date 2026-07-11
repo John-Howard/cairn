@@ -123,6 +123,8 @@ TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
     "has_transfers": lambda a: bool(a.transfers),
     "is_trial": lambda a: a.lifecycle_stage == LifecycleStage.TRIAL,
     "adm_solely_automated_significant": _adm_solely_automated_significant,
+    "online_childrens_service": lambda a: a.online_childrens_service_flag,
+    "is_further_processing": lambda a: a.is_further_processing,
 }
 
 
@@ -320,6 +322,34 @@ def _adm_art22_safeguards(activity: ProcessingActivity) -> str | None:
     return None
 
 
+def _childrens_service_protections(activity: ProcessingActivity) -> str | None:
+    if not activity.children_flag:
+        return (
+            "Online children's-service flag is set but 'Involves children' is not — "
+            "review the flags for consistency"
+        )
+    if not activity.childrens_matters_note:
+        return (
+            "Record the 'likely to be accessed' assessment and how children's "
+            "higher-protection matters were taken into account (Art 25(1), DUAA s81)"
+        )
+    if not activity.dpias:
+        return (
+            "An online service likely to be accessed by children requires DPIA screening "
+            "(children's higher-protection duty)"
+        )
+    return None
+
+
+def _further_processing_note_present(activity: ProcessingActivity) -> str | None:
+    if not activity.further_processing_note:
+        return (
+            "Further processing requires a recorded compatibility assessment "
+            "(purpose-limitation)"
+        )
+    return None
+
+
 REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "active_sensitive_condition": _sensitive_condition,
     "art10_basis_present": _art10_present,
@@ -337,6 +367,8 @@ REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "trial_requirements": _trial_requirements,
     "no_unapproved_references": _no_unapproved_references,
     "adm_art22_safeguards": _adm_art22_safeguards,
+    "childrens_service_protections": _childrens_service_protections,
+    "further_processing_note_present": _further_processing_note_present,
 }
 
 
@@ -462,6 +494,22 @@ RULES: list[Rule] = [
         trigger="adm_solely_automated_significant",
         requirement="adm_art22_safeguards",
         applicability=Applicability(regime=Regime.GENERAL),
+    ),
+    Rule(
+        id="20",
+        description="Online children's services must evidence the higher-protection matters "
+        "(spec clarification pending final ICO guidance)",
+        severity=Severity.WARN,
+        trigger="online_childrens_service",
+        requirement="childrens_service_protections",
+    ),
+    Rule(
+        id="21",
+        description="Further processing needs a compatibility assessment "
+        "(spec clarification pending final ICO guidance)",
+        severity=Severity.WARN,
+        trigger="is_further_processing",
+        requirement="further_processing_note_present",
     ),
 ]
 

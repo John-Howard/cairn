@@ -240,6 +240,51 @@ def test_edit_round_trip_preserves_fields_and_versions(activities_client, activi
         assert version.version_change_note == "Renamed and clarified description"
 
 
+def test_childrens_and_further_processing_fields_round_trip(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _token(activities_client)
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    owner_id = _user_id(activities_web_engine, "Cara Curator")
+    data = _minimal_create_data(
+        token,
+        prevention_id,
+        owner_id,
+        online_childrens_service_flag="true",
+        childrens_matters_note="Likely-to-be-accessed assessment complete.",
+        is_further_processing="true",
+        further_processing_note="Compatible with original notification purpose.",
+    )
+    response = activities_client.post("/activities", data=data)
+    assert response.status_code == 302
+    activity_id = response.headers["location"].removeprefix("/activities/")
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.online_childrens_service_flag is True
+        assert activity.childrens_matters_note == "Likely-to-be-accessed assessment complete."
+        assert activity.is_further_processing is True
+        assert (
+            activity.further_processing_note == "Compatible with original notification purpose."
+        )
+
+    edit_page = activities_client.get(f"/activities/{activity_id}/edit")
+    token = _extract_csrf(edit_page.text)
+    edit_data = _minimal_create_data(token, prevention_id, owner_id)
+    response = activities_client.post(f"/activities/{activity_id}", data=edit_data)
+    assert response.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.online_childrens_service_flag is False
+        assert activity.childrens_matters_note is None
+        assert activity.is_further_processing is False
+        assert activity.further_processing_note is None
+
+
 def test_version_timeline_shows_after_edit(activities_client, activities_web_engine):
     activity_id = _create_activity(
         activities_client, activities_web_engine, login_as="Cara Curator"

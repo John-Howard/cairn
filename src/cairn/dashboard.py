@@ -29,6 +29,14 @@ router = APIRouter()
 
 TRIAL_WINDOW_DAYS = 60
 
+COMMENCEMENT_LABELS = {
+    "duaa_principal": (
+        "DUAA principal provisions — Arts 22A–22D ADM, s85 transfer test, "
+        "purpose limitation (SI 2026/82)"
+    ),
+    "s164a_complaints": "DPA 2018 s164A complaints-handling duty",
+}
+
 
 def _function_labels(session: Session) -> dict[str, str]:
     return {
@@ -122,6 +130,11 @@ def dashboard(
         if colour in ("red", "yellow"):
             complaints_attention.append((complaint, label, colour))
 
+    commencement_watch = [
+        (COMMENCEMENT_LABELS.get(k, k), v)
+        for k, v in sorted((profile.commencement_watch or {}).items())
+    ]
+
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -148,6 +161,7 @@ def dashboard(
             "function_labels": function_labels,
             "open_complaints_count": len(open_complaints),
             "complaints_attention": complaints_attention,
+            "commencement_watch": commencement_watch,
             "csrf_token": get_csrf_token(request),
         },
     )

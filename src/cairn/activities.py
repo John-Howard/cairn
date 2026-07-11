@@ -113,10 +113,14 @@ NEW_ACTIVITY_DEFAULTS = {
     "trial_end": "",
     "purpose": "",
     "categories_of_processing": "",
+    "is_further_processing": False,
+    "further_processing_note": "",
     "personal_data_source": [],
     "is_statutory_task": False,
     "vulnerable_or_safeguarding_flag": False,
     "children_flag": False,
+    "online_childrens_service_flag": False,
+    "childrens_matters_note": "",
     "external_data_use_mode": ExternalDataUseMode.NONE.value,
     "lineage_granularity": LineageGranularity.ACTIVITY.value,
     "high_risk_flag": False,
@@ -259,10 +263,14 @@ def _parse_activity_form(form) -> dict:
         "trial_end": form.get("trial_end", ""),
         "purpose": form.get("purpose", "").strip(),
         "categories_of_processing": form.get("categories_of_processing", "").strip(),
+        "is_further_processing": form.get("is_further_processing") is not None,
+        "further_processing_note": form.get("further_processing_note", "").strip(),
         "personal_data_source": form.getlist("personal_data_source"),
         "is_statutory_task": form.get("is_statutory_task") is not None,
         "vulnerable_or_safeguarding_flag": form.get("vulnerable_or_safeguarding_flag") is not None,
         "children_flag": form.get("children_flag") is not None,
+        "online_childrens_service_flag": form.get("online_childrens_service_flag") is not None,
+        "childrens_matters_note": form.get("childrens_matters_note", "").strip(),
         "external_data_use_mode": form.get(
             "external_data_use_mode", ExternalDataUseMode.NONE.value
         ),
@@ -352,10 +360,14 @@ def _apply_activity_values(activity: ProcessingActivity, values: dict) -> None:
     activity.trial_end = date.fromisoformat(values["trial_end"]) if values["trial_end"] else None
     activity.purpose = values["purpose"]
     activity.categories_of_processing = values["categories_of_processing"] or None
+    activity.is_further_processing = values["is_further_processing"]
+    activity.further_processing_note = values["further_processing_note"] or None
     activity.personal_data_source = values["personal_data_source"]
     activity.is_statutory_task = values["is_statutory_task"]
     activity.vulnerable_or_safeguarding_flag = values["vulnerable_or_safeguarding_flag"]
     activity.children_flag = values["children_flag"]
+    activity.online_childrens_service_flag = values["online_childrens_service_flag"]
+    activity.childrens_matters_note = values["childrens_matters_note"] or None
     activity.external_data_use_mode = ExternalDataUseMode(values["external_data_use_mode"])
     activity.lineage_granularity = LineageGranularity(values["lineage_granularity"])
     activity.high_risk_flag = values["high_risk_flag"]
@@ -384,10 +396,14 @@ def _activity_to_values(activity: ProcessingActivity) -> dict:
         "trial_end": activity.trial_end.isoformat() if activity.trial_end else "",
         "purpose": activity.purpose,
         "categories_of_processing": activity.categories_of_processing or "",
+        "is_further_processing": activity.is_further_processing,
+        "further_processing_note": activity.further_processing_note or "",
         "personal_data_source": list(activity.personal_data_source or []),
         "is_statutory_task": activity.is_statutory_task,
         "vulnerable_or_safeguarding_flag": activity.vulnerable_or_safeguarding_flag,
         "children_flag": activity.children_flag,
+        "online_childrens_service_flag": activity.online_childrens_service_flag,
+        "childrens_matters_note": activity.childrens_matters_note or "",
         "external_data_use_mode": activity.external_data_use_mode.value,
         "lineage_granularity": activity.lineage_granularity.value,
         "high_risk_flag": activity.high_risk_flag,

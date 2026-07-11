@@ -29,11 +29,15 @@
   {{ date_input("trial_end", "Trial end", values.trial_end, error=error_map.get("trial_end")) }}
   {{ textarea("purpose", "Purpose", values.purpose, error=error_map.get("purpose")) }}
   {{ textarea("categories_of_processing", "Categories of processing", values.categories_of_processing, hint="Required when controller or processor is processor", error=error_map.get("categories_of_processing")) }}
+  {{ checkbox("is_further_processing", "Further processing of data collected for another purpose", checked=values.is_further_processing) }}
+  {{ textarea("further_processing_note", "Compatibility assessment", values.further_processing_note, hint="How the new purpose is compatible with the purpose the data was originally collected for") }}
   {{ checkboxes("personal_data_source", "Personal data source", personal_data_source_options, checked=values.personal_data_source) }}
   {% if error_map.get("personal_data_source") %}<p class="govuk-error-message">{{ error_map.get("personal_data_source") }}</p>{% endif %}
   {{ checkbox("is_statutory_task", "This is a statutory task", checked=values.is_statutory_task) }}
   {{ checkbox("vulnerable_or_safeguarding_flag", "Involves vulnerable persons or safeguarding", checked=values.vulnerable_or_safeguarding_flag) }}
   {{ checkbox("children_flag", "Involves children", checked=values.children_flag) }}
+  {{ checkbox("online_childrens_service_flag", "Information society service likely to be accessed by children", checked=values.online_childrens_service_flag, hint="Applies regardless of intended audience (UK GDPR Art 25(1), DUAA s81)") }}
+  {{ textarea("childrens_matters_note", "Children's higher-protection assessment", values.childrens_matters_note, hint="The 'likely to be accessed' assessment and how the design has particular regard to protecting and supporting children, their awareness of risks and rights, and their different needs at different ages and stages of development") }}
   {{ select("external_data_use_mode", "External data use mode", external_data_use_mode_options, selected=values.external_data_use_mode) }}
   {{ select("lineage_granularity", "Lineage granularity", lineage_granularity_options, selected=values.lineage_granularity) }}
   {{ checkbox("high_risk_flag", "High risk", checked=values.high_risk_flag) }}

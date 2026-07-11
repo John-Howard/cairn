@@ -449,3 +449,75 @@ def test_rule19_not_applicable_for_law_enforcement_regime(session, actor, frs_pr
     )
     session.flush()
     assert _rule_finding(evaluate(activity, frs_profile), "19") is None
+
+
+def test_rule20_not_applicable_without_online_childrens_service_flag(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    assert _rule_finding(evaluate(activity, frs_profile), "20") is None
+
+
+def test_rule20_fires_when_children_flag_inconsistent(session, actor, frs_profile):
+    activity = make_activity(session, actor, online_childrens_service_flag=True)
+    finding = _rule_finding(evaluate(activity, frs_profile), "20")
+    assert finding is not None
+    assert finding.severity == Severity.WARN
+    assert "review the flags for consistency" in finding.message
+
+
+def test_rule20_fires_when_note_missing(session, actor, frs_profile):
+    activity = make_activity(
+        session, actor, online_childrens_service_flag=True, children_flag=True
+    )
+    finding = _rule_finding(evaluate(activity, frs_profile), "20")
+    assert finding is not None
+    assert finding.severity == Severity.WARN
+    assert "likely to be accessed" in finding.message
+
+
+def test_rule20_fires_when_dpia_missing(session, actor, frs_profile):
+    activity = make_activity(
+        session,
+        actor,
+        online_childrens_service_flag=True,
+        children_flag=True,
+        childrens_matters_note="Assessment complete.",
+    )
+    finding = _rule_finding(evaluate(activity, frs_profile), "20")
+    assert finding is not None
+    assert finding.severity == Severity.WARN
+    assert "DPIA" in finding.message
+
+
+def test_rule20_clears_when_all_satisfied(session, actor, frs_profile):
+    activity = make_activity(
+        session,
+        actor,
+        online_childrens_service_flag=True,
+        children_flag=True,
+        childrens_matters_note="Assessment complete.",
+    )
+    make_dpia(session, activity)
+    assert _rule_finding(evaluate(activity, frs_profile), "20") is None
+
+
+def test_rule21_not_applicable_without_further_processing_flag(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    assert _rule_finding(evaluate(activity, frs_profile), "21") is None
+
+
+def test_rule21_fires_without_note(session, actor, frs_profile):
+    activity = make_activity(session, actor, is_further_processing=True)
+    finding = _rule_finding(evaluate(activity, frs_profile), "21")
+    assert finding is not None
+    assert finding.severity == Severity.WARN
+    assert "compatibility assessment" in finding.message
+
+
+def test_rule21_clears_with_note(session, actor, frs_profile):
+    activity = make_activity(
+        session,
+        actor,
+        is_further_processing=True,
+        further_processing_note="Compatible with original notification purpose.",
+    )
+    assert _rule_finding(evaluate(activity, frs_profile), "21") is None

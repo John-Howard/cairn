@@ -11,8 +11,8 @@
 |---|---|
 | `.github/workflows/ci.yml` | CI on every push to `main` and every PR: `uv sync` → `ruff check` → `pytest`, plus a Docker image build (`push: false`) so the Dockerfile can never silently rot |
 | `Dockerfile` | Multi-stage OCI image: uv-locked prod-only install, `python:3.14-slim`, non-root `cairn` user, `HEALTHCHECK` on `/healthz`, uvicorn entrypoint |
-| `docker-compose.yml` | The reference deployment: `app` + `postgres:17` with healthcheck-gated startup and a named volume. `DATABASE_URL` is wired for sub-phase 2a (the app does not read it yet) |
-| `src/cairn/web.py` | Minimal web entrypoint — `GET /healthz` only. The full application accretes here from 2a |
+| `docker-compose.yml` | The reference deployment: `app` + `postgres:17` with healthcheck-gated startup and a named volume. `DATABASE_URL`, `SESSION_SECRET` and `AUTH_MODE` are read by the app (`src/cairn/settings.py`); migrations are a deliberate manual step (`docker compose run --rm app alembic upgrade head` — see `admin-reference.md`) |
+| `src/cairn/web.py` | Application entrypoint: `create_app()` assembles session/CSRF middleware, `GET /healthz`, and the full router set (auth, setup, dashboard, vocabularies, regime policy, basis, registers, activities, imports, users, complaints) |
 | `uv.lock` | The single source of dependency truth for dev, CI and the image alike |
 
 ## 2. Environments

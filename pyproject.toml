@@ -40,4 +40,4 @@ extend-exclude = ["migrations/versions"]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.File"]

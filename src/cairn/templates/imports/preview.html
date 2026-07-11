@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Import preview{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-full">
+    <h1 class="govuk-heading-l">Import preview — {{ batch.filename }}</h1>
+
+    {% if processed %}
+    <p class="govuk-body">This import has already been processed. Status: <strong class="govuk-tag">{{ batch.status.value }}</strong></p>
+    <p class="govuk-body"><a class="govuk-link" href="/imports">Back to import</a></p>
+    {% else %}
+
+    <p class="govuk-body">{{ row_count }} row(s): {{ error_count }} with errors, {{ warning_count }} with warnings.</p>
+
+    {% if not can_confirm %}
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+      <div role="alert">
+        <h2 class="govuk-error-summary__title">There is a problem</h2>
+        <div class="govuk-error-summary__body">Fix the CSV and re-upload — a batch with any row error cannot be confirmed.</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <table class="govuk-table">
+      <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+          <th scope="col" class="govuk-table__header">Row</th>
+          <th scope="col" class="govuk-table__header">Name</th>
+          <th scope="col" class="govuk-table__header">Status</th>
+          <th scope="col" class="govuk-table__header">Messages</th>
+          <th scope="col" class="govuk-table__header">Matched</th>
+          <th scope="col" class="govuk-table__header">Will be proposed</th>
+        </tr>
+      </thead>
+      <tbody class="govuk-table__body">
+        {% for report in reports %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ report.index }}</td>
+          <td class="govuk-table__cell">{{ report.values.name }}</td>
+          <td class="govuk-table__cell">
+            {% if report.errors %}
+            <strong class="govuk-tag govuk-tag--red">Error</strong>
+            {% elif report.warnings %}
+            <strong class="govuk-tag govuk-tag--yellow">Warning</strong>
+            {% else %}
+            <strong class="govuk-tag govuk-tag--green">OK</strong>
+            {% endif %}
+          </td>
+          <td class="govuk-table__cell">
+            {% for message in report.errors %}<p class="govuk-body-s govuk-!-margin-bottom-1">{{ message }}</p>{% endfor %}
+            {% for message in report.warnings %}<p class="govuk-body-s govuk-!-margin-bottom-1">{{ message }}</p>{% endfor %}
+          </td>
+          <td class="govuk-table__cell">
+            {% for column, entries in report.matches.items() %}
+            <p class="govuk-body-s govuk-!-margin-bottom-1"><strong>{{ column_labels[column] }}:</strong> {{ entries | map(attribute=1) | join(", ") }}</p>
+            {% endfor %}
+          </td>
+          <td class="govuk-table__cell">
+            {% for column, names in report.proposals.items() %}
+            <p class="govuk-body-s govuk-!-margin-bottom-1"><strong>{{ column_labels[column] }}:</strong> {{ names | join(", ") }}</p>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 class="govuk-heading-m">New vocabulary proposals</h2>
+    {% if proposals %}
+    <ul class="govuk-list govuk-list--bullet">
+      {% for column, names in proposals.items() %}
+      <li><strong>{{ column_labels[column] }}:</strong> {{ names | join(", ") }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="govuk-body">No new vocabulary proposals.</p>
+    {% endif %}
+
+    {% if can_confirm %}
+    <form method="post" action="/imports/{{ batch.id }}/confirm" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="govuk-button" data-module="govuk-button">Confirm import</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/imports/{{ batch.id }}/cancel" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel import</button>
+    </form>
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

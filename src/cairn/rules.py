@@ -103,6 +103,10 @@ def _external_data_source_special_category(activity: ProcessingActivity) -> bool
     )
 
 
+def _adm_solely_automated_significant(activity: ProcessingActivity) -> bool:
+    return any(r.solely_automated and r.significant_effects for r in activity.adm_records)
+
+
 TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
     "always": lambda a: True,
     "has_special_category_data": lambda a: a.special_category_flag,
@@ -118,6 +122,7 @@ TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
     "is_analytics_modelling": lambda a: a.activity_type == ActivityType.ANALYTICS_MODELLING,
     "has_transfers": lambda a: bool(a.transfers),
     "is_trial": lambda a: a.lifecycle_stage == LifecycleStage.TRIAL,
+    "adm_solely_automated_significant": _adm_solely_automated_significant,
 }
 
 
@@ -291,6 +296,30 @@ def _no_unapproved_references(activity: ProcessingActivity) -> str | None:
     return None
 
 
+def _adm_art22_safeguards(activity: ProcessingActivity) -> str | None:
+    for record in activity.adm_records:
+        if not (record.solely_automated and record.significant_effects):
+            continue
+        if not (record.human_review and record.contestability and record.accuracy_bias_checks):
+            return (
+                "Solely-automated decisions with significant effects require the Art 22C "
+                "safeguards: human review, contestability, and accuracy/bias checks"
+            )
+        if activity.special_category_flag:
+            basis = active_basis(activity)
+            if (
+                basis is None
+                or basis.art9_condition is None
+                or basis.art9_condition.code not in ("a", "g")
+            ):
+                return (
+                    "Art 22B: solely-automated significant decisions using special-category "
+                    "data are only permitted with explicit consent (Art 9(2)(a)) or "
+                    "substantial public interest (Art 9(2)(g)) on the active basis record"
+                )
+    return None
+
+
 REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "active_sensitive_condition": _sensitive_condition,
     "art10_basis_present": _art10_present,
@@ -307,6 +336,7 @@ REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "transfer_safeguards_test_present": _transfer_safeguards_test_present,
     "trial_requirements": _trial_requirements,
     "no_unapproved_references": _no_unapproved_references,
+    "adm_art22_safeguards": _adm_art22_safeguards,
 }
 
 
@@ -423,6 +453,15 @@ RULES: list[Rule] = [
         severity=Severity.BLOCK,
         trigger="always",
         requirement="no_unapproved_references",
+    ),
+    Rule(
+        id="19",
+        description="Solely-automated significant decisions need Art 22B/22C conditions and "
+        "safeguards",
+        severity=Severity.BLOCK,
+        trigger="adm_solely_automated_significant",
+        requirement="adm_art22_safeguards",
+        applicability=Applicability(regime=Regime.GENERAL),
     ),
 ]
 

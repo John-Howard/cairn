@@ -9,6 +9,7 @@ from cairn.models import (
     ActivitySecurity,
     AdequacyStatus,
     ContractDSA,
+    DecisionSupportADM,
     ExternalDataSource,
     LegalEntity,
     LegalEntityRoleType,
@@ -361,6 +362,118 @@ def test_adm_author_forbidden_for_contributor(activities_client, activities_web_
     _login(activities_client, activities_web_engine, "Cody Contributor")
     response = activities_client.get(f"/activities/{activity_id}/adm/new")
     assert response.status_code == 403
+
+
+def test_adm_automated_requires_explicit_tristate_answers(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        external_data_use_mode="manual",
+    )
+    source_id = _add_data_source(activities_web_engine)
+    link_token = _token(activities_client)
+    activities_client.post(
+        f"/activities/{activity_id}/data-sources",
+        data={"csrf_token": link_token, "item_id": source_id},
+    )
+    token = _get_token_for(activities_client, f"/activities/{activity_id}/adm/new")
+
+    response = activities_client.post(
+        f"/activities/{activity_id}/adm/new",
+        data={
+            "csrf_token": token,
+            "use_mode": "automated",
+            "data_sources": [source_id],
+        },
+    )
+    assert response.status_code == 422
+    assert "Answer whether decisions are solely automated" in response.text
+    assert "Answer whether decisions have legal or similarly significant effects" in response.text
+
+
+def test_adm_automated_round_trip_persists_tristate_answers(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        external_data_use_mode="manual",
+    )
+    source_id = _add_data_source(activities_web_engine)
+    link_token = _token(activities_client)
+    activities_client.post(
+        f"/activities/{activity_id}/data-sources",
+        data={"csrf_token": link_token, "item_id": source_id},
+    )
+    token = _get_token_for(activities_client, f"/activities/{activity_id}/adm/new")
+
+    response = activities_client.post(
+        f"/activities/{activity_id}/adm/new",
+        data={
+            "csrf_token": token,
+            "use_mode": "automated",
+            "solely_automated": "true",
+            "significant_effects": "false",
+            "data_sources": [source_id],
+        },
+    )
+    assert response.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        adm = db.scalars(
+            select(DecisionSupportADM).where(DecisionSupportADM.activity_id == activity_id)
+        ).one()
+        assert adm.solely_automated is True
+        assert adm.significant_effects is False
+
+
+def test_adm_manual_round_trip_persists_none_when_unanswered(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        external_data_use_mode="manual",
+    )
+    source_id = _add_data_source(activities_web_engine)
+    link_token = _token(activities_client)
+    activities_client.post(
+        f"/activities/{activity_id}/data-sources",
+        data={"csrf_token": link_token, "item_id": source_id},
+    )
+    token = _get_token_for(activities_client, f"/activities/{activity_id}/adm/new")
+
+    response = activities_client.post(
+        f"/activities/{activity_id}/adm/new",
+        data={
+            "csrf_token": token,
+            "use_mode": "manual",
+            "data_sources": [source_id],
+        },
+    )
+    assert response.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        adm = db.scalars(
+            select(DecisionSupportADM).where(DecisionSupportADM.activity_id == activity_id)
+        ).one()
+        assert adm.solely_automated is None
+        assert adm.significant_effects is None
+        adm_id = adm.id
+
+    edit_form = activities_client.get(f"/activities/{activity_id}/adm/{adm_id}/edit")
+    assert 'name="solely_automated" type="radio" value="true" checked' not in edit_form.text
+    assert 'name="solely_automated" type="radio" value="false" checked' not in edit_form.text
+    assert 'name="significant_effects" type="radio" value="true" checked' not in edit_form.text
+    assert 'name="significant_effects" type="radio" value="false" checked' not in edit_form.text
+
+    detail = activities_client.get(f"/activities/{activity_id}")
+    assert detail.text.count("Not assessed") == 2
 
 
 def test_feeds_editor_and_fed_by_and_rule10(activities_client, activities_web_engine):

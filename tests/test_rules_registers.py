@@ -9,19 +9,23 @@ from cairn.models import (
     DecisionSupportADM,
     ExternalDataSource,
     ExternalDataUseMode,
+    LawfulBasisRecord,
     LifecycleStage,
     LineageGranularity,
+    PersonalDataCategory,
     PrivacyNotice,
     ProcessingActivity,
     Recipient,
     RecipientType,
+    Regime,
+    RegimeScope,
     ScreeningOutcome,
     SourceSpecialCategory,
     ThirdCountry,
     Transfer,
 )
 from cairn.rules import Severity, evaluate
-from conftest import business_function, transfer_mechanism
+from conftest import art6, art9, business_function, transfer_mechanism
 
 
 def make_activity(session, actor, **overrides):
@@ -305,3 +309,143 @@ def test_rule8_automated_requires_adm_record(session, actor, frs_profile):
     activity.adm_records.append(DecisionSupportADM(use_mode=ADMUseMode.AUTOMATED))
     session.flush()
     assert [f for f in evaluate(activity, frs_profile) if f.rule_id == "8"] == []
+
+
+def test_rule19_fires_when_human_review_missing(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    activity.adm_records.append(
+        DecisionSupportADM(
+            use_mode=ADMUseMode.AUTOMATED,
+            solely_automated=True,
+            significant_effects=True,
+            contestability="Right to request human review via casework team.",
+            accuracy_bias_checks="Annual bias audit against protected characteristics.",
+        )
+    )
+    session.flush()
+    finding = _rule_finding(evaluate(activity, frs_profile), "19")
+    assert finding is not None
+    assert finding.severity == Severity.BLOCK
+    assert "Art 22C" in finding.message
+
+
+def test_rule19_fires_when_contestability_missing(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    activity.adm_records.append(
+        DecisionSupportADM(
+            use_mode=ADMUseMode.AUTOMATED,
+            solely_automated=True,
+            significant_effects=True,
+            human_review="A caseworker reviews every flagged decision.",
+            accuracy_bias_checks="Annual bias audit against protected characteristics.",
+        )
+    )
+    session.flush()
+    finding = _rule_finding(evaluate(activity, frs_profile), "19")
+    assert finding is not None
+    assert "Art 22C" in finding.message
+
+
+def test_rule19_clears_with_all_safeguards_non_special_category(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    activity.adm_records.append(
+        DecisionSupportADM(
+            use_mode=ADMUseMode.AUTOMATED,
+            solely_automated=True,
+            significant_effects=True,
+            human_review="A caseworker reviews every flagged decision.",
+            contestability="Right to request human review via casework team.",
+            accuracy_bias_checks="Annual bias audit against protected characteristics.",
+        )
+    )
+    session.flush()
+    assert _rule_finding(evaluate(activity, frs_profile), "19") is None
+
+
+def _make_special_category_adm_activity(session, actor):
+    health = PersonalDataCategory(label="health data (rule19)", is_special_category=True)
+    activity = make_activity(session, actor, data_categories=[health])
+    activity.adm_records.append(
+        DecisionSupportADM(
+            use_mode=ADMUseMode.AUTOMATED,
+            solely_automated=True,
+            significant_effects=True,
+            human_review="A caseworker reviews every flagged decision.",
+            contestability="Right to request human review via casework team.",
+            accuracy_bias_checks="Annual bias audit against protected characteristics.",
+        )
+    )
+    session.flush()
+    return activity
+
+
+def test_rule19_special_category_fires_for_non_qualifying_condition(session, actor, frs_profile):
+    activity = _make_special_category_adm_activity(session, actor)
+    activity.basis_records.append(
+        LawfulBasisRecord(
+            regime_scope=RegimeScope.PART2,
+            art6_basis=art6(session, "e"),
+            art9_condition=art9(session, "h"),
+        )
+    )
+    session.flush()
+    finding = _rule_finding(evaluate(activity, frs_profile), "19")
+    assert finding is not None
+    assert "Art 22B" in finding.message
+
+
+def test_rule19_special_category_clears_for_substantial_public_interest(
+    session, actor, frs_profile
+):
+    activity = _make_special_category_adm_activity(session, actor)
+    activity.basis_records.append(
+        LawfulBasisRecord(
+            regime_scope=RegimeScope.PART2,
+            art6_basis=art6(session, "e"),
+            art9_condition=art9(session, "g"),
+        )
+    )
+    session.flush()
+    assert _rule_finding(evaluate(activity, frs_profile), "19") is None
+
+
+def test_rule19_special_category_clears_for_explicit_consent(session, actor, frs_profile):
+    activity = _make_special_category_adm_activity(session, actor)
+    activity.basis_records.append(
+        LawfulBasisRecord(
+            regime_scope=RegimeScope.PART2,
+            art6_basis=art6(session, "a"),
+            art9_condition=art9(session, "a"),
+        )
+    )
+    session.flush()
+    assert _rule_finding(evaluate(activity, frs_profile), "19") is None
+
+
+def test_rule19_not_applicable_when_solely_automated_only(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    activity.adm_records.append(
+        DecisionSupportADM(use_mode=ADMUseMode.AUTOMATED, solely_automated=True)
+    )
+    session.flush()
+    assert _rule_finding(evaluate(activity, frs_profile), "19") is None
+
+
+def test_rule19_not_applicable_when_neither_answered(session, actor, frs_profile):
+    activity = make_activity(session, actor)
+    activity.adm_records.append(DecisionSupportADM(use_mode=ADMUseMode.AUTOMATED))
+    session.flush()
+    assert _rule_finding(evaluate(activity, frs_profile), "19") is None
+
+
+def test_rule19_not_applicable_for_law_enforcement_regime(session, actor, frs_profile):
+    activity = make_activity(session, actor, regime=Regime.LAW_ENFORCEMENT)
+    activity.adm_records.append(
+        DecisionSupportADM(
+            use_mode=ADMUseMode.AUTOMATED,
+            solely_automated=True,
+            significant_effects=True,
+        )
+    )
+    session.flush()
+    assert _rule_finding(evaluate(activity, frs_profile), "19") is None

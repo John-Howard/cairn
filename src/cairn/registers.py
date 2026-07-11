@@ -840,8 +840,8 @@ def _new_adm_values() -> dict:
     return {
         "use_mode": ADMUseMode.MANUAL.value,
         "technique": "",
-        "solely_automated": False,
-        "significant_effects": False,
+        "solely_automated": "",
+        "significant_effects": "",
         "accuracy_bias_checks": "",
         "human_review": "",
         "contestability": "",
@@ -850,12 +850,18 @@ def _new_adm_values() -> dict:
     }
 
 
+def _tristate_to_value(value: bool | None) -> str:
+    if value is None:
+        return ""
+    return "true" if value else "false"
+
+
 def _adm_to_values(adm: DecisionSupportADM) -> dict:
     return {
         "use_mode": adm.use_mode.value,
         "technique": adm.technique or "",
-        "solely_automated": bool(adm.solely_automated),
-        "significant_effects": bool(adm.significant_effects),
+        "solely_automated": _tristate_to_value(adm.solely_automated),
+        "significant_effects": _tristate_to_value(adm.significant_effects),
         "accuracy_bias_checks": adm.accuracy_bias_checks or "",
         "human_review": adm.human_review or "",
         "contestability": adm.contestability or "",
@@ -868,8 +874,8 @@ def _parse_adm_form(form) -> dict:
     return {
         "use_mode": form.get("use_mode", ADMUseMode.MANUAL.value),
         "technique": form.get("technique", "").strip(),
-        "solely_automated": form.get("solely_automated") is not None,
-        "significant_effects": form.get("significant_effects") is not None,
+        "solely_automated": form.get("solely_automated", ""),
+        "significant_effects": form.get("significant_effects", ""),
         "accuracy_bias_checks": form.get("accuracy_bias_checks", "").strip(),
         "human_review": form.get("human_review", "").strip(),
         "contestability": form.get("contestability", "").strip(),
@@ -878,12 +884,25 @@ def _parse_adm_form(form) -> dict:
     }
 
 
+ADM_TRISTATE_MESSAGES = {
+    "solely_automated": "Answer whether decisions are solely automated (Art 22A assessment)",
+    "significant_effects": "Answer whether decisions have legal or similarly significant "
+    "effects (Art 22A assessment)",
+}
+
+
 def _validate_adm(activity: ProcessingActivity, values: dict) -> list[dict]:
     errors = []
     try:
         ADMUseMode(values["use_mode"])
     except ValueError:
         errors.append({"field": "use_mode", "message": "Select a valid use mode"})
+    for field_name, message in ADM_TRISTATE_MESSAGES.items():
+        value = values[field_name]
+        if value not in ("", "true", "false"):
+            errors.append({"field": field_name, "message": message})
+        elif value == "" and values["use_mode"] == ADMUseMode.AUTOMATED.value:
+            errors.append({"field": field_name, "message": message})
     linked_source_ids = {s.id for s in activity.data_sources}
     if not values["data_sources"]:
         errors.append({"field": "data_sources", "message": "Select at least one data source"})
@@ -910,8 +929,12 @@ def _validate_adm(activity: ProcessingActivity, values: dict) -> list[dict]:
 def _apply_adm_values(session: Session, adm: DecisionSupportADM, values: dict) -> None:
     adm.use_mode = ADMUseMode(values["use_mode"])
     adm.technique = values["technique"] or None
-    adm.solely_automated = values["solely_automated"]
-    adm.significant_effects = values["significant_effects"]
+    adm.solely_automated = (
+        None if not values["solely_automated"] else values["solely_automated"] == "true"
+    )
+    adm.significant_effects = (
+        None if not values["significant_effects"] else values["significant_effects"] == "true"
+    )
     adm.accuracy_bias_checks = values["accuracy_bias_checks"] or None
     adm.human_review = values["human_review"] or None
     adm.contestability = values["contestability"] or None

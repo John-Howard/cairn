@@ -7,6 +7,9 @@
     <h1 class="govuk-heading-l">Processing activities</h1>
   </div>
   <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+    {% if user.role.value in ("curator", "approver_dpo") %}
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="/imports">Import questionnaire</a>
+    {% endif %}
     <a class="govuk-button" data-module="govuk-button" href="/activities/new">Add activity</a>
   </div>
 </div>

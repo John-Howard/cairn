@@ -28,6 +28,7 @@ from cairn.models.enums import (
     ControllerOrProcessor,
     EntryStatus,
     ExternalDataUseMode,
+    ImportBatchStatus,
     LEClassification,
     LegalEntityRoleType,
     LegalEntityTopology,
@@ -51,6 +52,7 @@ from cairn.models.enums import (
     WithdrawalStatus,
 )
 from cairn.models.history import AuditEvent, RecordVersion
+from cairn.models.imports import ImportBatch
 from cairn.models.supporting import (
     DPIA,
     AppropriatePolicyDocument,
@@ -118,6 +120,8 @@ __all__ = [
     "EntryStatus",
     "ExternalDataSource",
     "ExternalDataUseMode",
+    "ImportBatch",
+    "ImportBatchStatus",
     "LEClassification",
     "LIADecision",
     "LIARLIRecord",

@@ -8,6 +8,9 @@
   <a class="govuk-link govuk-!-margin-right-4" href="/register">Register</a>
   <a class="govuk-link govuk-!-margin-right-4" href="/activities">Processing activities</a>
   <a class="govuk-link govuk-!-margin-right-4" href="/vocabularies">Vocabularies</a>
+  {% if user.role.value in ("curator", "approver_dpo") %}
+  <a class="govuk-link govuk-!-margin-right-4" href="/complaints">Complaints</a>
+  {% endif %}
   {% if user.role.value == "approver_dpo" %}
   <a class="govuk-link govuk-!-margin-right-4" href="/regime-policy">Regime Policy</a>
   <a class="govuk-link" href="/users">Users</a>
@@ -104,6 +107,31 @@
     {% endfor %}
   </tbody>
 </table>
+
+<h2 class="govuk-heading-m">Complaints</h2>
+<p class="govuk-body">{{ open_complaints_count }} open complaint{{ "" if open_complaints_count == 1 else "s" }}.{% if user.role.value in ("curator", "approver_dpo") %} <a class="govuk-link" href="/complaints">View all</a>{% endif %}</p>
+{% if complaints_attention %}
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Received</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+      <th scope="col" class="govuk-table__header">Response due</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for complaint, label, colour in complaints_attention %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ complaint.received_at.date() }}</td>
+      <td class="govuk-table__cell"><strong class="govuk-tag govuk-tag--{{ colour }}">{{ label }}</strong></td>
+      <td class="govuk-table__cell">{{ complaint.response_due }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="govuk-body">No complaints needing attention.</p>
+{% endif %}
 
 <h2 class="govuk-heading-m">Overdue reviews</h2>
 {% if overdue %}

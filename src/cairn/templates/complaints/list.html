@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Complaints{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Complaints</h1>
+  </div>
+  <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+    <a class="govuk-button" data-module="govuk-button" href="/complaints/new">Add complaint</a>
+  </div>
+</div>
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Received</th>
+      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Acknowledged</th>
+      <th scope="col" class="govuk-table__header">Response due</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+      <th scope="col" class="govuk-table__header">Outcome</th>
+      <th scope="col" class="govuk-table__header">ICO route</th>
+      <th scope="col" class="govuk-table__header">Actions</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.complaint.received_at.date() }}</td>
+      <td class="govuk-table__cell">
+        {% if row.complaint.activity_id %}
+        <a class="govuk-link" href="/activities/{{ row.complaint.activity_id }}">{{ row.activity_name }}</a>
+        {% else %}
+        —
+        {% endif %}
+      </td>
+      <td class="govuk-table__cell">{{ row.complaint.acknowledged_at.date() if row.complaint.acknowledged_at else "—" }}</td>
+      <td class="govuk-table__cell">{{ row.complaint.response_due }}</td>
+      <td class="govuk-table__cell"><strong class="govuk-tag govuk-tag--{{ row.status_colour }}">{{ row.status_label }}</strong></td>
+      <td class="govuk-table__cell">{{ row.outcome_label }}</td>
+      <td class="govuk-table__cell">{% if row.complaint.ico_escalation_flagged %}<strong class="govuk-tag govuk-tag--blue">Yes</strong>{% else %}—{% endif %}</td>
+      <td class="govuk-table__cell">
+        <a class="govuk-link" href="/complaints/{{ row.complaint.id }}/edit">Edit</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell" colspan="8">No complaints.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="govuk-body"><a class="govuk-link" href="/">Back to dashboard</a></p>
+{% endblock %}

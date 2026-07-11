@@ -15,8 +15,8 @@
     {% for row in adm_rows %}
     <tr class="govuk-table__row">
       <td class="govuk-table__cell">{{ adm_use_mode_labels[row.adm.use_mode] }}</td>
-      <td class="govuk-table__cell">{{ "Yes" if row.adm.solely_automated else "No" }}</td>
-      <td class="govuk-table__cell">{{ "Yes" if row.adm.significant_effects else "No" }}</td>
+      <td class="govuk-table__cell">{{ "Not assessed" if row.adm.solely_automated is none else ("Yes" if row.adm.solely_automated else "No") }}</td>
+      <td class="govuk-table__cell">{{ "Not assessed" if row.adm.significant_effects is none else ("Yes" if row.adm.significant_effects else "No") }}</td>
       <td class="govuk-table__cell">{{ row.data_source_labels | join(", ") }}</td>
       <td class="govuk-table__cell">{{ row.transparency_label }}</td>
       <td class="govuk-table__cell">

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Users</h1>
+  </div>
+  <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+    <a class="govuk-button" data-module="govuk-button" href="/users/new">Add user</a>
+  </div>
+</div>
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Name</th>
+      <th scope="col" class="govuk-table__header">Role</th>
+      <th scope="col" class="govuk-table__header">Business function</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+      <th scope="col" class="govuk-table__header">Actions</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for row in rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ row.user.display_name }}</td>
+      <td class="govuk-table__cell">{{ row.role_label }}</td>
+      <td class="govuk-table__cell">{{ row.function_label }}</td>
+      <td class="govuk-table__cell">
+        {% if row.user.is_active %}
+        <strong class="govuk-tag govuk-tag--green">Active</strong>
+        {% else %}
+        <strong class="govuk-tag govuk-tag--grey">Deactivated</strong>
+        {% endif %}
+      </td>
+      <td class="govuk-table__cell">
+        <a class="govuk-link govuk-!-margin-right-2" href="/users/{{ row.user.id }}/edit">Edit</a>
+        {% if row.user.is_active %}
+        <form method="post" action="/users/{{ row.user.id }}/deactivate" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--warning govuk-!-margin-bottom-0">Deactivate</button>
+        </form>
+        {% else %}
+        <form method="post" action="/users/{{ row.user.id }}/reactivate" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0">Reactivate</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell" colspan="5">No users.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="govuk-body"><a class="govuk-link" href="/">Back to dashboard</a></p>
+{% endblock %}

@@ -34,3 +34,4 @@ class User(AuditedBase):
     display_name: Mapped[str]
     role: Mapped[Role] = mapped_column(default=Role.VIEWER)
     business_function_id: Mapped[str | None] = mapped_column(ForeignKey("business_function.id"))
+    is_active: Mapped[bool] = mapped_column(default=True)

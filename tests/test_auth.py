@@ -64,6 +64,24 @@ def test_viewer_cannot_reach_setup_once_it_exists(seeded_client, seeded_web_engi
     assert response.status_code == 404
 
 
+def test_inactive_user_excluded_from_login_and_rejected(seeded_client, seeded_web_engine):
+    viewer_id = _user_id(seeded_web_engine, "Vic Viewer")
+    with Session(seeded_web_engine) as db:
+        db.info["actor_id"] = _user_id(seeded_web_engine, "Ada Approver")
+        target = db.get(User, viewer_id)
+        target.is_active = False
+        db.commit()
+
+    login_page = seeded_client.get("/login")
+    assert "Vic Viewer" not in login_page.text
+    token = _extract_csrf(login_page.text)
+
+    response = seeded_client.post(
+        "/login", data={"user_id": viewer_id, "csrf_token": token}
+    )
+    assert response.status_code == 400
+
+
 def test_require_role_allows_matching_role():
     dependency = require_role(Role.APPROVER_DPO)
     approver = User(display_name="Ada", role=Role.APPROVER_DPO)

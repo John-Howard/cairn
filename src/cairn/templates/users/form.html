@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "macros.html" import error_summary, text_input, select, textarea %}
+{% block title %}{{ "Edit user" if is_edit else "Add user" }}{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ "Edit user" if is_edit else "Add user" }}</h1>
+
+{{ error_summary(errors) }}
+
+<form method="post" action="{{ ('/users/' ~ target_id) if is_edit else '/users' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  {{ text_input("display_name", "Display name", values.display_name, error=error_map.get("display_name")) }}
+  {{ select("role", "Role", role_options, selected=values.role) }}
+  {{ select("business_function_id", "Business function", business_function_options, selected=values.business_function_id) }}
+  {% if error_map.get("business_function_id") %}<p class="govuk-error-message">{{ error_map.get("business_function_id") }}</p>{% endif %}
+
+  {% if is_edit %}
+  {{ textarea("change_note", "Change note", "", hint="Optional reason for this change") }}
+  {% endif %}
+
+  <button type="submit" class="govuk-button" data-module="govuk-button">{{ "Save changes" if is_edit else "Create user" }}</button>
+</form>
+<p class="govuk-body"><a class="govuk-link" href="/users">Back to users</a></p>
+{% endblock %}

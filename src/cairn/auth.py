@@ -36,7 +36,7 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
     if not user_id:
         raise LoginRequired
     user = session.get(User, user_id)
-    if user is None:
+    if user is None or not user.is_active:
         raise LoginRequired
     return user
 
@@ -61,7 +61,9 @@ def _require_dev_mode() -> None:
 @router.get("/login")
 def login_form(request: Request, session: Session = Depends(get_session)):
     _require_dev_mode()
-    users = session.scalars(select(User).order_by(User.display_name)).all()
+    users = session.scalars(
+        select(User).where(User.is_active).order_by(User.display_name)
+    ).all()
     user_options = [(user.id, f"{user.display_name} — {user.role.value}") for user in users]
     return templates.TemplateResponse(
         request,
@@ -80,7 +82,7 @@ def login_submit(
     _require_dev_mode()
     verify_csrf(request, csrf_token)
     user = session.get(User, user_id)
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(status_code=400, detail="Unknown user")
     request.session.clear()
     request.session["user_id"] = user.id

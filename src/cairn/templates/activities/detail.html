@@ -80,6 +80,17 @@
   </div>
 </dl>
 
+{% if can_edit %}
+<form method="post" action="/activities/{{ activity.id }}/mark-reviewed">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="govuk-form-group">
+    <label class="govuk-label" for="next_review_at">Mark reviewed — next review date</label>
+    <input class="govuk-input govuk-input--width-10" id="next_review_at" name="next_review_at" type="date">
+  </div>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Mark reviewed</button>
+</form>
+{% endif %}
+
 <h2 class="govuk-heading-m">Derived flags</h2>
 <ul class="govuk-list govuk-list--bullet">
   <li>Special category: {{ "Yes" if activity.special_category_flag else "No" }}</li>

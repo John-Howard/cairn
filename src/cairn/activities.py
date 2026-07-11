@@ -225,7 +225,9 @@ def _business_function_options(session: Session) -> list[tuple[str, str]]:
 
 
 def _user_options(session: Session) -> list[tuple[str, str]]:
-    users = session.scalars(select(User).order_by(User.display_name)).all()
+    users = session.scalars(
+        select(User).where(User.is_active).order_by(User.display_name)
+    ).all()
     return [(u.id, u.display_name) for u in users]
 
 
@@ -506,7 +508,7 @@ def _render_detail(
         .where(
             AuditEvent.entity_type == "processing_activity",
             AuditEvent.entity_id == activity.id,
-            AuditEvent.event.in_(("regime_change", "status_change")),
+            AuditEvent.event.in_(("regime_change", "status_change", "review_completed")),
         )
         .order_by(AuditEvent.occurred_at.desc())
     ).all()
@@ -847,6 +849,53 @@ async def regime_override(
     except ValueError as exc:
         return _render_detail(request, session, activity, user, error=str(exc), status_code=422)
     session.flush()
+    return RedirectResponse(f"/activities/{activity.id}", status_code=302)
+
+
+@router.post("/activities/{activity_id}/mark-reviewed")
+async def mark_reviewed(
+    activity_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    activity = _get_activity(session, activity_id)
+    _require_can_edit(user, activity)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    next_review_at = form.get("next_review_at", "")
+    if not _valid_date(next_review_at) or date.fromisoformat(next_review_at) <= date.today():
+        return _render_detail(
+            request,
+            session,
+            activity,
+            user,
+            error="Enter a future next review date",
+            status_code=422,
+        )
+    old_value = {
+        "last_reviewed_at": (
+            activity.last_reviewed_at.isoformat() if activity.last_reviewed_at else None
+        ),
+        "next_review_at": (
+            activity.next_review_at.isoformat() if activity.next_review_at else None
+        ),
+    }
+    activity.last_reviewed_at = date.today()
+    activity.next_review_at = date.fromisoformat(next_review_at)
+    activity.change_note = "Review completed"
+    session.flush()
+    record_event(
+        session,
+        entity=activity,
+        event="review_completed",
+        actor=user,
+        old_value=old_value,
+        new_value={
+            "last_reviewed_at": activity.last_reviewed_at.isoformat(),
+            "next_review_at": activity.next_review_at.isoformat(),
+        },
+    )
     return RedirectResponse(f"/activities/{activity.id}", status_code=302)
 
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from cairn.models import (
     DataSubjectCategory,
     EntryStatus,
     LawfulBasisRecord,
+    LifecycleStage,
     PersonalDataCategory,
     ProcessingActivity,
     Recipient,
@@ -605,3 +606,161 @@ def test_activation_gate_blocks_on_unapproved_reference(activities_client, activ
     with Session(activities_web_engine) as db:
         activity = db.get(ProcessingActivity, activity_id)
         assert activity.record_status == RecordStatus.ACTIVE
+
+
+def test_trial_to_live_contributor_forbidden_approver_allowed(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client,
+        activities_web_engine,
+        login_as="Cody Contributor",
+        lifecycle_stage="trial",
+        trial_start="2026-01-01",
+        trial_end="2026-12-31",
+    )
+
+    edit_page = activities_client.get(f"/activities/{activity_id}/edit")
+    token = _extract_csrf(edit_page.text)
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    owner_id = _user_id(activities_web_engine, "Cody Contributor")
+    data = _minimal_create_data(
+        token, prevention_id, owner_id, lifecycle_stage="live"
+    )
+    response = activities_client.post(f"/activities/{activity_id}", data=data)
+    assert response.status_code == 403
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.lifecycle_stage == LifecycleStage.TRIAL
+
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    edit_page = activities_client.get(f"/activities/{activity_id}/edit")
+    token = _extract_csrf(edit_page.text)
+    data = _minimal_create_data(
+        token, prevention_id, owner_id, lifecycle_stage="live"
+    )
+    response = activities_client.post(f"/activities/{activity_id}", data=data)
+    assert response.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.lifecycle_stage == LifecycleStage.LIVE
+
+
+def test_mark_reviewed_happy_path(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    token = _token(activities_client)
+    future = (date.today() + timedelta(days=90)).isoformat()
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": future},
+    )
+    assert response.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.last_reviewed_at == date.today()
+        assert activity.next_review_at.isoformat() == future
+        assert activity.version == 2
+        event = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_type == "processing_activity",
+                AuditEvent.entity_id == activity_id,
+                AuditEvent.event == "review_completed",
+            )
+        ).one()
+        assert event.new_value["next_review_at"] == future
+
+
+def test_mark_reviewed_past_date_rejected(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    token = _token(activities_client)
+    past = (date.today() - timedelta(days=1)).isoformat()
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": past},
+    )
+    assert response.status_code == 422
+    assert "future next review date" in response.text.lower()
+
+
+def test_mark_reviewed_today_rejected(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    token = _token(activities_client)
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": date.today().isoformat()},
+    )
+    assert response.status_code == 422
+
+
+def test_mark_reviewed_missing_or_invalid_date_rejected(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    token = _token(activities_client)
+    missing = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": ""},
+    )
+    assert missing.status_code == 422
+
+    token = _token(activities_client)
+    invalid = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": "not-a-date"},
+    )
+    assert invalid.status_code == 422
+
+
+def test_mark_reviewed_viewer_forbidden(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cara Curator"
+    )
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    future = (date.today() + timedelta(days=90)).isoformat()
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": "no-token", "next_review_at": future},
+    )
+    assert response.status_code == 403
+
+
+def test_mark_reviewed_contributor_other_function_forbidden(
+    activities_client, activities_web_engine
+):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cody Contributor"
+    )
+    _login(activities_client, activities_web_engine, "Ollie OtherFunction")
+    future = (date.today() + timedelta(days=90)).isoformat()
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": "no-token", "next_review_at": future},
+    )
+    assert response.status_code == 403
+
+
+def test_mark_reviewed_curator_ok(activities_client, activities_web_engine):
+    activity_id = _create_activity(
+        activities_client, activities_web_engine, login_as="Cody Contributor"
+    )
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _token(activities_client)
+    future = (date.today() + timedelta(days=90)).isoformat()
+    response = activities_client.post(
+        f"/activities/{activity_id}/mark-reviewed",
+        data={"csrf_token": token, "next_review_at": future},
+    )
+    assert response.status_code == 302

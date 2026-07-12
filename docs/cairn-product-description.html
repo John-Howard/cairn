@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cairn — Record of Processing Activities</title>
+<style>
+  :root {
+    /* granite neutrals with a faint blue-green bias — chosen, not defaulted */
+    --paper:    #E7E6E1;
+    --surface:  #F3F2EE;
+    --ink:      #23262A;
+    --muted:    #575D62;
+    --hair:     #D3D2CB;
+    --accent:   #456650;  /* lichen green */
+    --accent-soft: #4566500f;
+    --stone:    #9C6B33;  /* cairnstone ochre — mark only */
+    --stone1:   #8C9089;
+    --stone2:   #A7A69E;
+    --stone3:   #8F938C;
+    --stone4:   #B4B2A8;
+    --shadow:   0 1px 2px rgba(30,33,36,.06), 0 8px 24px rgba(30,33,36,.05);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:   #15171A;
+      --surface: #1D2023;
+      --ink:     #E7E8E4;
+      --muted:   #9BA1A1;
+      --hair:    #2C2F33;
+      --accent:  #8FB58C;
+      --accent-soft: #8FB58C12;
+      --stone:   #C79A5A;
+      --stone1:  #565A56;
+      --stone2:  #6E716A;
+      --stone3:  #5C605A;
+      --stone4:  #7C7E75;
+      --shadow:  0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper:#E7E6E1; --surface:#F3F2EE; --ink:#23262A; --muted:#575D62; --hair:#D3D2CB;
+    --accent:#456650; --accent-soft:#4566500f; --stone:#9C6B33;
+    --stone1:#8C9089; --stone2:#A7A69E; --stone3:#8F938C; --stone4:#B4B2A8;
+    --shadow:0 1px 2px rgba(30,33,36,.06), 0 8px 24px rgba(30,33,36,.05);
+  }
+  :root[data-theme="dark"] {
+    --paper:#15171A; --surface:#1D2023; --ink:#E7E8E4; --muted:#9BA1A1; --hair:#2C2F33;
+    --accent:#8FB58C; --accent-soft:#8FB58C12; --stone:#C79A5A;
+    --stone1:#565A56; --stone2:#6E716A; --stone3:#5C605A; --stone4:#7C7E75;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .page {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: clamp(1.75rem, 4vw, 3.5rem) clamp(1.25rem, 4vw, 3rem) 3rem;
+  }
+
+  /* ── strata divider: bars of varying width, like sediment ── */
+  .strata { display: flex; gap: .4rem; align-items: center; }
+  .strata i { height: 3px; border-radius: 2px; background: var(--hair); display: block; }
+  .strata i:nth-child(1){ width: 2.4rem; background: var(--accent); opacity:.85; }
+  .strata i:nth-child(2){ width: 1.1rem; }
+  .strata i:nth-child(3){ width: 3.3rem; }
+  .strata i:nth-child(4){ width: .7rem; background: var(--stone); opacity:.8; }
+  .strata i:nth-child(5){ width: 1.8rem; }
+
+  /* ── masthead ── */
+  header.mast { display: flex; gap: 1.4rem; align-items: flex-start; }
+  .mark { flex: none; width: 60px; margin-top: .2rem; }
+  .mark svg { display: block; width: 100%; height: auto; }
+  .wordmark { font-family: var(--serif); font-weight: 600; font-size: clamp(2.6rem, 7vw, 3.9rem);
+    letter-spacing: -.01em; line-height: .95; margin: 0; }
+  .eyebrow { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 .55rem; font-weight: 600; }
+  .tagline { font-family: var(--serif); font-size: clamp(1.15rem, 2.6vw, 1.5rem);
+    line-height: 1.3; color: var(--ink); margin: .9rem 0 0; max-width: 34ch; text-wrap: balance;
+    border-left: 3px solid var(--accent); padding-left: .85rem; }
+
+  .lead { font-size: 1.06rem; color: var(--ink); margin: 1.9rem 0 0; max-width: 62ch; }
+  .lead strong { color: var(--accent); font-weight: 600; }
+  .lead + .lead { margin-top: .95rem; color: var(--muted); }
+
+  section { margin-top: 2.5rem; }
+  h2.sec { font-family: var(--serif); font-size: 1.35rem; margin: 0 0 .3rem; font-weight: 600;
+    letter-spacing: -.005em; }
+  .sec-lead { color: var(--muted); margin: 0 0 1.3rem; max-width: 60ch; font-size: .97rem; }
+
+  /* ── feature grid ── */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .85rem; }
+  .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 10px;
+    padding: 1rem 1.1rem 1.05rem; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 .3rem; font-size: .96rem; font-weight: 650; letter-spacing: -.005em;
+    display: flex; align-items: baseline; gap: .5rem; }
+  .card h3::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 2px;
+    background: var(--accent); transform: translateY(-1px); }
+  .card p { margin: 0; font-size: .9rem; color: var(--muted); line-height: 1.52; }
+  .card p b { color: var(--ink); font-weight: 600; }
+
+  /* ── why strip ── */
+  .why { background: var(--accent-soft); border: 1px solid var(--hair); border-radius: 12px;
+    padding: 1.4rem 1.5rem; }
+  .why-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem 2rem; margin-top: 1rem; }
+  .why-item { display: flex; gap: .7rem; }
+  .why-item .k { flex: none; font-family: var(--serif); font-weight: 600; color: var(--accent);
+    font-size: .95rem; width: 8.5rem; }
+  .why-item .v { font-size: .9rem; color: var(--muted); }
+  .why-item .v b { color: var(--ink); font-weight: 600; }
+
+  footer { margin-top: 2.6rem; padding-top: 1.3rem; border-top: 1px solid var(--hair);
+    display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; align-items: baseline;
+    justify-content: space-between; }
+  footer .close { font-family: var(--serif); font-style: italic; color: var(--ink); font-size: 1rem; }
+  footer .basis { font-size: .78rem; color: var(--muted); max-width: 40ch; }
+
+  /* entrance — quiet, load only */
+  @media (prefers-reduced-motion: no-preference) {
+    .rise { opacity: 0; transform: translateY(10px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+    .d1 { animation-delay: .05s; } .d2 { animation-delay: .14s; } .d3 { animation-delay: .24s; }
+    .d4 { animation-delay: .34s; }
+    .mark .stn { opacity: 0; transform: translateY(-6px); animation: settle .5s cubic-bezier(.2,.8,.2,1) forwards; }
+    .mark .s1 { animation-delay: .12s; } .mark .s2 { animation-delay: .26s; }
+    .mark .s3 { animation-delay: .40s; } .mark .s4 { animation-delay: .54s; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+    @keyframes settle { to { opacity: 1; transform: none; } }
+  }
+
+  @media (max-width: 40rem) {
+    .grid, .why-grid { grid-template-columns: 1fr; }
+    header.mast { flex-direction: column; gap: .9rem; }
+    .why-item .k { width: 7rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="mast rise">
+    <div class="mark" aria-hidden="true">
+      <!-- stacked stones: four layers, decreasing — the mark and the architecture -->
+      <svg viewBox="0 0 60 76">
+        <ellipse class="stn s4" cx="30" cy="12" rx="15" ry="8"  fill="var(--stone2)"/>
+        <ellipse class="stn s3" cx="30" cy="28" rx="20" ry="9"  fill="var(--stone3)"/>
+        <ellipse class="stn s2" cx="30" cy="46" rx="25" ry="10" fill="var(--stone1)"/>
+        <ellipse class="stn s1" cx="30" cy="65" rx="29" ry="10" fill="var(--stone4)"/>
+        <ellipse cx="24" cy="10" rx="2.3" ry="1.4" fill="var(--stone)" opacity=".85"/>
+      </svg>
+    </div>
+    <div>
+      <p class="eyebrow">Record of Processing Activities</p>
+      <h1 class="wordmark">Cairn</h1>
+      <p class="tagline">The Record of Processing Activities, built for accountability — not spreadsheets.</p>
+    </div>
+  </header>
+
+  <p class="lead rise d1"><strong>Cairn</strong> is a web application for compiling and maintaining a Record of Processing Activities that meets UK GDPR <b>Article&nbsp;30</b> and the accountability principle. A cairn is a stack of stones that marks the safe path across difficult ground; the tool does the same for data protection — a durable, well-kept record of exactly how an organisation processes personal data, and why it is lawful.</p>
+
+  <p class="lead d1">Cairn is a <b>single-tenant, configurable product</b>: each organisation runs its own instance, so there is no shared store and no cross-tenant isolation to worry about. One configurable core is tailored at setup by an Organisation Profile and a sector pack of ready-made vocabularies and rules — the first ships for the Fire&nbsp;and&nbsp;Rescue&nbsp;Service; the same core supports police, health, local-authority or generic controller/processor profiles.</p>
+
+  <div class="strata rise d1" style="margin-top:1.9rem" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+
+  <section class="rise d2">
+    <h2 class="sec">What it does</h2>
+    <p class="sec-lead">Article&nbsp;30 is not met by a spreadsheet row per activity. Cairn models processing <b>relationally</b> — a central Processing Activity linked, at the right level of granularity, to the data subjects, data categories, recipients, systems, retention rules and lawful bases that actually apply. It is a full <b>integrated accountability record</b>: ROPA, lawful basis, DPIA, LIA/RLI, contracts, transfers, privacy notices, ADM safeguards and complaints, all linked and cross-checked.</p>
+    <div class="grid">
+      <div class="card"><h3>Complete Article&nbsp;30 register</h3><p>Controller <b>(Art&nbsp;30(1))</b> and processor <b>(Art&nbsp;30(2))</b> records, with a guided authoring wizard and junction editors for full granularity — including where adults, vulnerable adults and children diverge within one activity.</p></div>
+      <div class="card"><h3>Dual-regime by design</h3><p>Handles general processing <b>(Part&nbsp;2)</b> and law-enforcement processing <b>(Part&nbsp;3, s61/s62)</b>. A per-organisation Regime Policy sets the boundary; activities switch regime <b>without losing the inactive mapping</b>, and every switch is audited.</p></div>
+      <div class="card"><h3>Lawful basis, done properly</h3><p>Article&nbsp;6 and special-category / Schedule&nbsp;1&nbsp;&amp;&nbsp;8 conditions seeded from current legislation, with consent, Legitimate Interests and Appropriate Policy Document records where the basis requires them.</p></div>
+      <div class="card"><h3>Linked accountability registers</h3><p>DPIAs, contracts/DSAs, international transfers, privacy notices and automated decision-making <b>(Art&nbsp;22A–22D safeguards)</b>, each connected to the activities they support — security inherited from the linked system.</p></div>
+      <div class="card"><h3>Built-in validation</h3><p>A rule engine checks records against <b>21 rules</b> as you author, surfacing gaps and warnings — unapproved references, children's higher protection, further processing, ADM safeguards — before they become findings.</p></div>
+      <div class="card"><h3>Hybrid authoring workflow</h3><p>A central IG/DP team curates while departments contribute through questionnaires and CSV import. Propose-and-approve keeps vocabularies clean; review cycles keep records current.</p></div>
+      <div class="card"><h3>Export mapping layer</h3><p>Art&nbsp;30(1), Art&nbsp;30(2), s61 and combined ROPA views generated on demand as CSV. The stored model stays clean and normalised; exports never dictate the shape of the data.</p></div>
+      <div class="card"><h3>Dashboard, KPIs &amp; DUAA alignment</h3><p>A live view of register health, records due for review and open findings — updated for the <b>Data (Use and Access) Act&nbsp;2025</b>: statutory complaints (s164A), children's and further-processing fields, and a commencement watch.</p></div>
+    </div>
+  </section>
+
+  <section class="rise d3">
+    <h2 class="sec">Why Cairn</h2>
+    <div class="why">
+      <div class="strata" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="why-grid">
+        <div class="why-item"><span class="k">Relational</span><span class="v"><b>Not flat.</b> Granularity lives in the model, so the register survives contact with reality instead of collapsing into an unmaintainable sheet.</span></div>
+        <div class="why-item"><span class="k">Reversible</span><span class="v"><b>Fully audited.</b> Versioning, change notes and an append-only audit posture mean every change is recoverable and every decision is evidenced.</span></div>
+        <div class="why-item"><span class="k">Configurable</span><span class="v"><b>Not bespoke.</b> One codebase, tailored by profile. A new sector means seeding a pack, not rebuilding the tool.</span></div>
+        <div class="why-item"><span class="k">Self-hosted</span><span class="v"><b>Cloud-agnostic.</b> FastAPI, the GOV.UK Design System and PostgreSQL, deployed as a container in your own estate, with OIDC single sign-on and deny-by-default role-based access.</span></div>
+        <div class="why-item"><span class="k">Legally grounded</span><span class="v"><b>Traceable.</b> Vocabularies and rules trace back to specific legislation and ICO guidance, and are maintained against amendments as the law changes.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="rise d4">
+    <span class="close">A clear, defensible record of how you process personal data.</span>
+    <span class="basis">Built to UK&nbsp;ICO / UK&nbsp;GDPR Article&nbsp;30 and DPA&nbsp;2018 Parts&nbsp;2&nbsp;&amp;&nbsp;3 · aligned with the Data (Use and Access) Act&nbsp;2025.</span>
+  </footer>
+
+</div>
+</body>
+</html>

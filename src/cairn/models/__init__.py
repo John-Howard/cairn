@@ -29,6 +29,8 @@ from cairn.models.enums import (
     EntryStatus,
     ExternalDataUseMode,
     ImportBatchStatus,
+    IntakeAnswerKind,
+    IntakeStatus,
     LEClassification,
     LegalEntityRoleType,
     LegalEntityTopology,
@@ -53,6 +55,7 @@ from cairn.models.enums import (
 )
 from cairn.models.history import AuditEvent, RecordVersion
 from cairn.models.imports import ImportBatch
+from cairn.models.intake import IntakeGap, IntakeQuestion, IntakeSubmission
 from cairn.models.supporting import (
     DPIA,
     AppropriatePolicyDocument,
@@ -122,6 +125,11 @@ __all__ = [
     "ExternalDataUseMode",
     "ImportBatch",
     "ImportBatchStatus",
+    "IntakeAnswerKind",
+    "IntakeGap",
+    "IntakeQuestion",
+    "IntakeStatus",
+    "IntakeSubmission",
     "LEClassification",
     "LIADecision",
     "LIARLIRecord",

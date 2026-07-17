@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Intake{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Information audit intake</h1>
+    <p class="govuk-body">Record one intake per <strong>activity</strong> — each distinct thing your team does with information about people. A department will usually complete this several times. "Don't know" is a valid answer; the IG team will follow up.</p>
+    <a href="/intake/new" class="govuk-button" data-module="govuk-button">Start a new intake</a>
+  </div>
+</div>
+
+{% if submissions %}
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Department</th>
+      <th scope="col" class="govuk-table__header">Respondent</th>
+      <th scope="col" class="govuk-table__header">Status</th>
+      <th scope="col" class="govuk-table__header">Open gaps</th>
+      <th scope="col" class="govuk-table__header">Record</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for s in submissions %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ s.id }}">{{ s.activity_name }}</a></td>
+      <td class="govuk-table__cell">{{ s.business_function.label }}</td>
+      <td class="govuk-table__cell">{{ s.respondent.display_name }}</td>
+      <td class="govuk-table__cell">
+        {% if s.status.value == "in_progress" %}<strong class="govuk-tag govuk-tag--blue">In progress</strong>
+        {% elif s.status.value == "submitted" %}<strong class="govuk-tag govuk-tag--green">Submitted</strong>
+        {% else %}<strong class="govuk-tag govuk-tag--grey">Cancelled</strong>{% endif %}
+      </td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ open_gaps[s.id] }}</td>
+      <td class="govuk-table__cell">
+        {% if s.activity_id %}<a class="govuk-link" href="/activities/{{ s.activity_id }}">Draft activity</a>{% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="govuk-body">No intake submissions yet.</p>
+{% endif %}
+{% endblock %}

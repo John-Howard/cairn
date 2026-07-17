@@ -8,6 +8,9 @@
   <a class="govuk-link govuk-!-margin-right-4" href="/register">Register</a>
   <a class="govuk-link govuk-!-margin-right-4" href="/activities">Processing activities</a>
   <a class="govuk-link govuk-!-margin-right-4" href="/vocabularies">Vocabularies</a>
+  {% if user.role.value in ("contributor", "curator", "approver_dpo") %}
+  <a class="govuk-link govuk-!-margin-right-4" href="/intake">Intake</a>
+  {% endif %}
   {% if user.role.value in ("curator", "approver_dpo") %}
   <a class="govuk-link govuk-!-margin-right-4" href="/complaints">Complaints</a>
   {% endif %}

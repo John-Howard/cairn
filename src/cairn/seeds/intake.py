@@ -1,0 +1,261 @@
+"""FRS intake question set — Information Audit Question Set v0.1 as configuration.
+
+Wording, hints, ordering and options are data (Intake & Pilot Plan §2); the
+`populates` keys name field-mapping handlers in cairn.intake. Section A of the
+question set (department and respondent) is collected on the intake start screen,
+and B1/B2 (identifying and naming the activity) become the start screen's
+activity-name field — each wizard run documents one activity.
+"""
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from cairn.models import IntakeAnswerKind, IntakeQuestion
+
+# Business functions whose respondents see Section K (Question Set §K scope).
+ENFORCEMENT_FUNCTIONS = {
+    "Protection (Fire Safety Regulation & Enforcement)",
+    "Fire Investigation",
+    "Youth & Early Intervention",
+}
+
+PROMPT_LIST = (
+    "Think about your regular duties, not IT systems — recruiting, complaints, "
+    "community or school programmes, home visits, incidents, inspections or "
+    "enforcement, contracts, surveys, CCTV or body-worn video, referrals, mailing lists."
+)
+
+# (code, section, section_title, text, hint, kind, options, populates, enforcement_only)
+QUESTIONS: list[tuple] = [
+    # Section B — about this activity
+    ("B3", "B", "About this activity",
+     "Is this work new, a trial or a pilot?",
+     "If it is business as usual, answer No.",
+     IntakeAnswerKind.YES_NO, None, "lifecycle_trial", False),
+    ("B3_START", "B", "About this activity",
+     "If it is a trial or pilot — when did it start?",
+     None, IntakeAnswerKind.DATE, None, "trial_start", False),
+    ("B3_END", "B", "About this activity",
+     "If it is a trial or pilot — when is it due to end?",
+     None, IntakeAnswerKind.DATE, None, "trial_end", False),
+    ("B4", "B", "About this activity",
+     "Is your team doing anything with people's information that you think isn't "
+     "written down anywhere?",
+     PROMPT_LIST, IntakeAnswerKind.TEXTAREA, None, None, False),
+    # Section C — what the activity is for
+    ("C1", "C", "What the activity is for",
+     "In plain English, what is this activity and why do you do it?",
+     None, IntakeAnswerKind.TEXTAREA, None, "purpose", False),
+    ("C2", "C", "What the activity is for",
+     "What would happen if you didn't collect this information?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("C3", "C", "What the activity is for",
+     "Is there a law, statutory duty or policy that requires or allows you to do this?",
+     None, IntakeAnswerKind.YES_NO, None, "statutory_task", False),
+    ("C3_DETAIL", "C", "What the activity is for",
+     "If yes — which one, if you know?",
+     None, IntakeAnswerKind.TEXT, None, None, False),
+    ("C4", "C", "What the activity is for",
+     "Are you doing this work for another organisation, under their instructions?",
+     None, IntakeAnswerKind.YES_NO, None, "processor", False),
+    ("C4_ORG", "C", "What the activity is for",
+     "If yes — which organisation?",
+     None, IntakeAnswerKind.TEXT, None, None, False),
+    ("C5", "C", "What the activity is for",
+     "Are you doing this jointly with another organisation, where you both decide how it works?",
+     None, IntakeAnswerKind.YES_NO, None, "joint", False),
+    # Section D — whose information is it?
+    ("D1", "D", "Whose information is it?",
+     "Whose information do you handle in this activity?",
+     "For example: members of the public, people at incidents, employees, applicants, "
+     "cadets, business owners, partner-agency staff.",
+     IntakeAnswerKind.VOCAB_MULTI, {"vocab": "data_subjects"}, "data_subjects", False),
+    ("D2", "D", "Whose information is it?",
+     "Does this activity involve information about children or young people?",
+     None, IntakeAnswerKind.YES_NO, None, "children_flag", False),
+    ("D3", "D", "Whose information is it?",
+     "Does it involve vulnerable people, or people at risk?",
+     None, IntakeAnswerKind.YES_NO, None, "vulnerable_flag", False),
+    ("D4", "D", "Whose information is it?",
+     "Roughly how many people's records are involved?",
+     None, IntakeAnswerKind.SINGLE_CHOICE,
+     {"choices": [["handful", "A handful"], ["hundreds", "Hundreds"],
+                  ["thousands", "Thousands or more"]]},
+     None, False),
+    # Section E — what information do you hold?
+    ("E1", "E", "What information do you hold?",
+     "What information do you record about them?",
+     "For example: name, address, phone, date of birth, case notes, photos.",
+     IntakeAnswerKind.VOCAB_MULTI, {"vocab": "data_categories"}, "data_categories", False),
+    ("E2", "E", "What information do you hold?",
+     "Do you record any of the following?",
+     "Tick all that apply. These are 'special category' types with extra protection.",
+     IntakeAnswerKind.VOCAB_MULTI, {"vocab": "special_categories"}, "data_categories", False),
+    ("E3", "E", "What information do you hold?",
+     "Do you record anything about criminal offences, convictions, cautions, or suspected "
+     "offences (including vetting/DBS)?",
+     None, IntakeAnswerKind.YES_NO, None, "criminal_offence", False),
+    ("E4", "E", "What information do you hold?",
+     "If the people involved are different types (e.g. adults and children, or staff and "
+     "public) — do you hold different information about each? Please say which.",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    # Section F — where does the information come from?
+    ("F1", "F", "Where does the information come from?",
+     "Where do you get it from?",
+     "Tick all that apply.",
+     IntakeAnswerKind.MULTI_CHOICE,
+     {"choices": [
+         ["from_data_subject", "Directly from the person"],
+         ["from_third_party", "From a colleague, another team, another organisation or a supplier"],
+         ["public_source", "From a publicly available source"],
+     ]},
+     "personal_data_source", False),
+    ("F2", "F", "Where does the information come from?",
+     "If it comes from another organisation or a supplier — which one?",
+     "The IG team will check whether an agreement or contract is in place.",
+     IntakeAnswerKind.VOCAB_MULTI, {"vocab": "external_sources"}, "data_sources", False),
+    ("F3", "F", "Where does the information come from?",
+     "Do you combine information from different places to build a picture of someone, or "
+     "to score, rank or prioritise them?",
+     None, IntakeAnswerKind.YES_NO, None, "external_data_use", False),
+    ("F4", "F", "Where does the information come from?",
+     "If so — is that done by a person reviewing it, or automatically by a system or model?",
+     None, IntakeAnswerKind.SINGLE_CHOICE,
+     {"choices": [["person", "By a person"], ["system", "Automatically by a system or model"]]},
+     "external_data_use", False),
+    ("F5", "F", "Where does the information come from?",
+     "If automatic — does the system make the decision, or does it only suggest and "
+     "a person decides?",
+     None, IntakeAnswerKind.SINGLE_CHOICE,
+     {"choices": [["decides", "The system decides"],
+                  ["suggests", "It suggests — a person decides"]]},
+     None, False),
+    ("F6", "F", "Where does the information come from?",
+     "Are people told their information comes from these sources?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    # Section G — who else sees it?
+    ("G1", "G", "Who else sees it?",
+     "Who do you share this information with, outside your team?",
+     "Internal teams, other organisations, suppliers.",
+     IntakeAnswerKind.VOCAB_MULTI, {"vocab": "recipients"}, "recipients", False),
+    ("G2", "G", "Who else sees it?",
+     "For each one — why do you share it, and is there an agreement, contract or "
+     "information-sharing agreement in place?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("G3", "G", "Who else sees it?",
+     "Do you share it with any organisation outside the UK, or use any system that stores "
+     "data outside the UK (including cloud services)?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    ("G4", "G", "Who else sees it?",
+     "Does anyone else handle this information on your behalf (e.g. a supplier, contractor "
+     "or IT provider)?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    # Section H — where is it kept, and for how long?
+    ("H1", "H", "Where is it kept, and for how long?",
+     "Which systems, applications or databases hold this information?",
+     None, IntakeAnswerKind.VOCAB_MULTI, {"vocab": "systems"}, "systems", False),
+    ("H2", "H", "Where is it kept, and for how long?",
+     "Is any of it kept outside those systems — spreadsheets, shared drives, email, paper "
+     "files, notebooks, mobile devices?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("H3", "H", "Where is it kept, and for how long?",
+     "How long do you keep it, and what happens at the end?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("H4", "H", "Where is it kept, and for how long?",
+     "Is that retention period written down anywhere, or based on a legal requirement?",
+     None, IntakeAnswerKind.TEXT, None, None, False),
+    ("H5", "H", "Where is it kept, and for how long?",
+     "If you hold different types of information in this activity, do they have different "
+     "retention periods? Please say which.",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("H6", "H", "Where is it kept, and for how long?",
+     "How is it destroyed or deleted when no longer needed?",
+     None, IntakeAnswerKind.TEXT, None, None, False),
+    # Section I — how is it protected?
+    ("I1", "I", "How is it protected?",
+     "Who in your team can access this information — everyone, or specific roles?",
+     None, IntakeAnswerKind.TEXT, None, None, False),
+    ("I2", "I", "How is it protected?",
+     "Is access restricted by log-in, permissions, or physical security (e.g. locked cabinets)?",
+     "The IG/IT team will complete the technical detail for each system centrally — just "
+     "tell us where the information is and who can get to it.",
+     IntakeAnswerKind.TEXT, None, None, False),
+    ("I3", "I", "How is it protected?",
+     "Is it ever taken out of the office — on laptops, mobiles, tablets or appliance terminals?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    ("I4", "I", "How is it protected?",
+     "Have you had any near-misses, losses or incidents involving this information?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    # Section J — rights, consent and risk
+    ("J1", "J", "Rights, consent and risk",
+     "Do you ask people for their consent for this activity?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    ("J1_DETAIL", "J", "Rights, consent and risk",
+     "If yes — how is consent recorded, and how can someone withdraw it?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("J2", "J", "Rights, consent and risk",
+     "If children are involved and you rely on consent — how do you check age, and do you "
+     "get parental consent?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("J3", "J", "Rights, consent and risk",
+     "Are people told what you do with their information (e.g. a privacy notice, a leaflet, "
+     "a form, verbally)?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("J4", "J", "Rights, consent and risk",
+     "If someone asked to see everything you hold about them, could you find it?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    ("J5", "J", "Rights, consent and risk",
+     "Has a Data Protection Impact Assessment (DPIA) ever been done for this activity?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    ("J6", "J", "Rights, consent and risk",
+     "What's the worst thing that could happen if this information was lost, leaked or wrong?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    ("J7", "J", "Rights, consent and risk",
+     "Is there anything about this activity that worries you, or that you think we should look at?",
+     None, IntakeAnswerKind.TEXTAREA, None, None, False),
+    # Section K — enforcement and investigation teams only
+    ("K1", "K", "Enforcement and investigation",
+     "Does this activity involve investigating or prosecuting a possible offence?",
+     "Whether this work is treated as 'law enforcement processing' is a decision for the "
+     "DPO — your answers inform it.",
+     IntakeAnswerKind.YES_NO, None, None, True),
+    ("K2", "K", "Enforcement and investigation",
+     "Do you record whether someone is a suspect, witness, victim, or convicted?",
+     "Tick all that you record.",
+     IntakeAnswerKind.MULTI_CHOICE,
+     {"choices": [
+         ["suspect", "Suspect"], ["witness", "Witness"],
+         ["victim", "Victim"], ["convicted", "Convicted"], ["other", "Other"],
+     ]},
+     "le_classification", True),
+    ("K3", "K", "Enforcement and investigation",
+     "Do you distinguish between facts and your professional assessment or opinion "
+     "in case records?",
+     None, IntakeAnswerKind.YES_NO, None, "le_fact_vs_assessment", True),
+    ("K4", "K", "Enforcement and investigation",
+     "Does your case system record who accessed or disclosed a record, and when?",
+     None, IntakeAnswerKind.TEXTAREA, None, "s62_logging", True),
+]
+
+
+def seed_intake_questions(session: Session) -> None:
+    existing = session.scalars(select(IntakeQuestion.code)).all()
+    if existing:
+        return
+    for order, row in enumerate(QUESTIONS, start=1):
+        code, section, section_title, text, hint, kind, options, populates, enforcement = row
+        session.add(
+            IntakeQuestion(
+                code=code,
+                section=section,
+                section_title=section_title,
+                order=order,
+                text=text,
+                hint=hint,
+                answer_kind=kind,
+                options=options,
+                populates=populates,
+                enforcement_only=enforcement,
+            )
+        )
+    session.flush()

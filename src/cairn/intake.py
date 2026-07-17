@@ -50,6 +50,7 @@ from cairn.templating import templates
 router = APIRouter()
 
 require_intake_user = require_role(Role.CONTRIBUTOR, Role.CURATOR, Role.APPROVER_DPO)
+require_curator_or_approver = require_role(Role.CURATOR, Role.APPROVER_DPO)
 
 SECTION_ORDER = ["B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
 
@@ -444,6 +445,107 @@ async def intake_start(
     return RedirectResponse(f"/intake/{submission.id}/section/B", status_code=302)
 
 
+# Registered before /intake/{submission_id} so the literal path wins the match.
+@router.get("/intake/gaps")
+def intake_gaps(
+    request: Request,
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    gaps = session.scalars(
+        select(IntakeGap)
+        .join(IntakeSubmission, IntakeGap.submission_id == IntakeSubmission.id)
+        .order_by(IntakeSubmission.created_at, IntakeGap.question_code)
+    ).all()
+    open_groups: dict[str, dict] = {}
+    for gap in gaps:
+        if gap.resolved:
+            continue
+        group = open_groups.setdefault(
+            gap.submission_id, {"submission": gap.submission, "gaps": []}
+        )
+        group["gaps"].append(gap)
+    resolved = [g for g in gaps if g.resolved]
+    return templates.TemplateResponse(
+        request,
+        "intake/gaps.html",
+        {
+            **_base_context(request, user),
+            "open_groups": list(open_groups.values()),
+            "open_count": sum(len(g["gaps"]) for g in open_groups.values()),
+            "resolved": resolved,
+        },
+    )
+
+
+def _get_gap(session: Session, gap_id: str) -> IntakeGap:
+    gap = session.get(IntakeGap, gap_id)
+    if gap is None:
+        raise HTTPException(status_code=404)
+    return gap
+
+
+@router.post("/intake/gaps/{gap_id}/resolve")
+async def intake_gap_resolve(
+    gap_id: str,
+    request: Request,
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    gap = _get_gap(session, gap_id)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if gap.resolved:
+        raise HTTPException(status_code=422, detail="Gap is already resolved")
+    note = (form.get("resolution_note") or "").strip()
+    if not note:
+        raise HTTPException(
+            status_code=422,
+            detail="Record how the gap was resolved (e.g. what the interview established)",
+        )
+    gap.resolved = True
+    gap.resolution_note = note
+    gap.change_note = "Gap resolved"
+    session.flush()
+    record_event(
+        session,
+        entity=gap,
+        event="intake_gap_resolved",
+        actor=user,
+        reason=note,
+        new_value={"question_code": gap.question_code, "submission": gap.submission_id},
+    )
+    return RedirectResponse("/intake/gaps", status_code=302)
+
+
+@router.post("/intake/gaps/{gap_id}/reopen")
+async def intake_gap_reopen(
+    gap_id: str,
+    request: Request,
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    gap = _get_gap(session, gap_id)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if not gap.resolved:
+        raise HTTPException(status_code=422, detail="Gap is not resolved")
+    old_note = gap.resolution_note
+    gap.resolved = False
+    gap.resolution_note = None
+    gap.change_note = "Gap reopened"
+    session.flush()
+    record_event(
+        session,
+        entity=gap,
+        event="intake_gap_reopened",
+        actor=user,
+        old_value={"resolution_note": old_note},
+        new_value={"question_code": gap.question_code, "submission": gap.submission_id},
+    )
+    return RedirectResponse("/intake/gaps", status_code=302)
+
+
 @router.get("/intake/{submission_id}")
 def intake_view(
     submission_id: str,
@@ -465,7 +567,7 @@ def intake_view(
             "submission": submission,
             "questions": questions,
             "display": _display_map(session, submission, questions),
-            "gaps": [g for g in submission.gaps if not g.resolved],
+            "gaps": sorted(submission.gaps, key=lambda g: (g.resolved, g.question_code)),
         },
     )
 

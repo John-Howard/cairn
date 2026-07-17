@@ -20,9 +20,16 @@
 
     {% if gaps %}
     <div class="govuk-inset-text">
-      <p class="govuk-body govuk-!-margin-bottom-1"><strong>Open gaps for IG follow-up</strong></p>
-      <ul class="govuk-list govuk-list--bullet govuk-!-margin-bottom-0">
-        {% for gap in gaps %}<li>{{ gap.question_code }} — {{ gap.question_text }}</li>{% endfor %}
+      <p class="govuk-body govuk-!-margin-bottom-1"><strong>Gaps recorded for IG follow-up</strong></p>
+      <ul class="govuk-list govuk-!-margin-bottom-0">
+        {% for gap in gaps %}
+        <li class="govuk-!-margin-bottom-2">
+          {% if gap.resolved %}<strong class="govuk-tag govuk-tag--green">Resolved</strong>
+          {% else %}<strong class="govuk-tag govuk-tag--red">Open</strong>{% endif %}
+          {{ gap.question_code }} — {{ gap.question_text }}
+          {% if gap.resolution_note %}<br><span class="govuk-body-s">{{ gap.resolution_note }}</span>{% endif %}
+        </li>
+        {% endfor %}
       </ul>
     </div>
     {% endif %}

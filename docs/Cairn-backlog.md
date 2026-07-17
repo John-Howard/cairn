@@ -21,7 +21,7 @@ Test suite 282 passing; CI green throughout. **Remaining work before go-live is 
 
 ## 2. Gaps to close before or during staging *(ordered by risk)*
 
-1. **Session lifetime not enforced.** Security Architecture §2 specifies absolute lifetime 12h / idle timeout 60m; the session cookie currently uses the middleware default (~14 days) with no idle timeout. Small change (max_age + last-seen check in `current_user`), real security-posture drift until done. **Do before staging holds real data.**
+1. ~~**Session lifetime not enforced.**~~ **Done (2026-07-17):** idle timeout via rolling cookie `max_age` (`SESSION_IDLE_SECONDS`, default 60m); absolute lifetime via `auth_at` stamp checked in `current_user` (`SESSION_ABSOLUTE_SECONDS`, default 12h). Pre-existing sessions are invalidated on deploy (one-off re-login).
 2. **No RP-initiated logout.** "Sign out" clears Cairn's session but not the IdP's — on a shared machine the next visitor can sign straight back in. Either implement OIDC end-session redirect or document the residual risk and rely on estate screen-lock policy. Decision needed, then a small slice.
 3. **RBAC denials are not audited.** Security Architecture says failed/denied authorisations are recorded; OIDC login denials are logged, but in-app 403s (role checks) are not. Add an audit or structured-log hook on `require_role` failures.
 4. **JSON structured logging** (NFRs §5; tracked in admin ref §7). The OIDC denial log made this more visible: security-relevant events deserve machine-parseable logs before staging log collection is set up.

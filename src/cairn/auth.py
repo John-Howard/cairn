@@ -1,4 +1,5 @@
 import secrets
+import time
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -31,9 +32,27 @@ def verify_csrf(request: Request, submitted: str | None) -> None:
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
 
+def _now() -> float:
+    return time.time()
+
+
+def start_authenticated_session(request: Request, user_id: str) -> None:
+    """Fresh session for a just-authenticated user, stamped for lifetime checks."""
+    request.session.clear()
+    request.session["user_id"] = user_id
+    request.session["auth_at"] = int(_now())
+
+
 def current_user(request: Request, session: Session = Depends(get_session)) -> User:
     user_id = request.session.get("user_id")
     if not user_id:
+        raise LoginRequired
+    # Absolute session lifetime (Security Architecture §2). Sessions without a
+    # stamp predate lifetime enforcement and are treated as expired. The idle
+    # timeout is the cookie max_age (see create_app).
+    auth_at = request.session.get("auth_at")
+    if not isinstance(auth_at, int) or _now() - auth_at > get_settings().session_absolute_seconds:
+        request.session.clear()
         raise LoginRequired
     user = session.get(User, user_id)
     if user is None or not user.is_active:
@@ -98,8 +117,7 @@ def login_submit(
     user = session.get(User, user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=400, detail="Unknown user")
-    request.session.clear()
-    request.session["user_id"] = user.id
+    start_authenticated_session(request, user.id)
     return RedirectResponse("/", status_code=302)
 
 

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cairn.audit import record_event
-from cairn.auth import get_csrf_token, verify_csrf
+from cairn.auth import get_csrf_token, start_authenticated_session, verify_csrf
 from cairn.db import get_session
 from cairn.models import LegalEntityTopology, OrganisationProfile, OrgType, Regime, Role, User
 from cairn.seeds import seed_frs_pack, seed_legal
@@ -116,6 +116,6 @@ async def setup_submit(request: Request, session: Session = Depends(get_session)
         new_value={"org_name": org_name, "org_type": org_type.value},
     )
 
-    request.session["user_id"] = bootstrap_user.id
+    start_authenticated_session(request, bootstrap_user.id)
 
     return RedirectResponse("/", status_code=302)

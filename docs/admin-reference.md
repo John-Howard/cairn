@@ -16,6 +16,8 @@ All behaviour differences between environments come from environment variables (
 | `OIDC_ISSUER` | — | Required when `AUTH_MODE=oidc`. The IdP issuer URL; for Entra ID: `https://login.microsoftonline.com/<tenant-id>/v2.0` (discovery at `<issuer>/.well-known/openid-configuration`) |
 | `OIDC_CLIENT_ID` | — | Required when `AUTH_MODE=oidc`. The Entra app registration's application (client) ID |
 | `OIDC_CLIENT_SECRET` | — | Required when `AUTH_MODE=oidc`. Client secret from the app registration — inject from the estate's secret store, never commit |
+| `SESSION_IDLE_SECONDS` | `3600` | Idle timeout: the session cookie's rolling `max_age`. A user inactive this long is signed out |
+| `SESSION_ABSOLUTE_SECONDS` | `43200` | Absolute session lifetime (12h): however active, a login older than this is expired and the user re-authenticates |
 
 Setting up SSO end-to-end (Entra app registration, environment, first login, troubleshooting) is §5.
 

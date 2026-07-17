@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from cairn.audit import record_event
+from cairn.auth import start_authenticated_session
 from cairn.db import get_session
 from cairn.models import User
 from cairn.settings import get_settings
@@ -128,7 +129,6 @@ async def oidc_callback(request: Request, session: Session = Depends(get_session
         )
         return RedirectResponse("/login?error=denied", status_code=302)
     session.info["actor_id"] = user.id
-    request.session.clear()
-    request.session["user_id"] = user.id
+    start_authenticated_session(request, user.id)
     record_event(session, entity=user, event="login_succeeded", actor=user)
     return RedirectResponse("/", status_code=302)

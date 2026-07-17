@@ -98,3 +98,47 @@ def test_require_role_denies_other_roles():
         raised = True
         assert getattr(exc, "status_code", None) == 403
     assert raised
+
+
+def _login_seeded(client, engine, display_name="Ada Approver"):
+    token = _extract_csrf(client.get("/login").text)
+    response = client.post(
+        "/login", data={"user_id": _user_id(engine, display_name), "csrf_token": token}
+    )
+    assert response.status_code == 302
+    return response
+
+
+def test_session_cookie_carries_idle_max_age(seeded_client, seeded_web_engine):
+    response = _login_seeded(seeded_client, seeded_web_engine)
+    set_cookie = response.headers["set-cookie"]
+    assert "cairn_session" in set_cookie
+    assert "Max-Age=3600" in set_cookie
+
+
+def test_session_expires_after_absolute_lifetime(
+    seeded_client, seeded_web_engine, monkeypatch
+):
+    import cairn.auth as auth_module
+
+    _login_seeded(seeded_client, seeded_web_engine)
+    assert seeded_client.get("/").status_code == 200
+
+    real_now = auth_module._now()
+    monkeypatch.setattr(auth_module, "_now", lambda: real_now + 12 * 3600 + 60)
+    response = seeded_client.get("/")
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login"
+
+
+def test_session_without_auth_stamp_is_rejected(session):
+    import pytest as _pytest
+
+    from cairn.auth import LoginRequired, current_user
+
+    class _StubRequest:
+        def __init__(self):
+            self.session = {"user_id": "someone"}
+
+    with _pytest.raises(LoginRequired):
+        current_user(_StubRequest(), session)

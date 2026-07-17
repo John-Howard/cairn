@@ -52,6 +52,10 @@ def create_app() -> FastAPI:
         session_cookie="cairn_session",
         same_site="lax",
         https_only=settings.auth_mode == "oidc",
+        # The cookie is re-issued on every response, so max_age rolls with
+        # activity — this is the idle timeout. The absolute lifetime is the
+        # auth_at check in cairn.auth.current_user.
+        max_age=settings.session_idle_seconds,
     )
 
     @app.middleware("http")

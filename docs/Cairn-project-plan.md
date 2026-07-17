@@ -120,6 +120,8 @@ flowchart LR
 
 **Deliverables:** seeded reference data, a populated and linked ROPA derived from the audit, reconciled legacy records, pilot findings and question-set v0.2.
 
+**Worked artefacts** (per Intake & Pilot Plan §5): P1 seeding checklist (`Cairn-pilot-p1-seeding-checklist.md`), P2 dry-run script (`Cairn-pilot-p2-dryrun-script.md`), pilot communications pack (`Cairn-pilot-comms-pack.md`).
+
 **Dependency:** the pilot-enabling build milestone (2a + intake slice of 2d) plus sufficient Phase 3 assurance to hold real data.
 
 ---
@@ -171,4 +173,4 @@ Flagged now, to resolve when we go into detail:
 
 ---
 
-*Project Plan v0.1. Derives from Plan v0.12 and Spec v0.3; will iterate as detailed planning proceeds.*
+*Project Plan v0.2. Derives from Plan v0.12 and Spec v0.3; will iterate as detailed planning proceeds.*

@@ -136,4 +136,4 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 
 ---
 
-*Admin Reference v0.1 — update this document whenever the start/stop/deploy mechanics change (new auth mode, entrypoint migrations, logging).*
+*Admin Reference v0.2 (adds §5 SSO/OIDC setup) — update this document whenever the start/stop/deploy mechanics change (new auth mode, entrypoint migrations, logging).*

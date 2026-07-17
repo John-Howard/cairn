@@ -185,3 +185,69 @@ def test_callback_denies_unknown_user(oidc_client, monkeypatch):
 def test_oidc_routes_404_in_dev_mode(seeded_client):
     assert seeded_client.get("/auth/oidc/login").status_code == 404
     assert seeded_client.get("/auth/oidc/callback").status_code == 404
+
+
+ENTRA_LOGOUT = "https://login.microsoftonline.com/tenant/oauth2/v2.0/logout"
+
+
+class _FakeIdpWithMetadata(_FakeIdp):
+    def __init__(self, token, metadata):
+        super().__init__(token)
+        self._metadata = metadata
+
+    async def load_server_metadata(self):
+        return self._metadata
+
+
+def _sign_in(oidc_client, monkeypatch, metadata, claims=None):
+    claims = claims or {"sub": ENTRA_SUB, "email": "ada@example.org"}
+    monkeypatch.setattr(
+        oidc_module,
+        "_client",
+        lambda: _FakeIdpWithMetadata({"userinfo": claims}, metadata),
+    )
+    response = oidc_client.get("/auth/oidc/callback?code=x&state=y")
+    assert response.status_code == 302
+    from test_activities import _extract_csrf
+
+    return _extract_csrf(oidc_client.get("/").text)
+
+
+def test_logout_redirects_to_idp_end_session_with_hint(oidc_client, monkeypatch):
+    token = _sign_in(
+        oidc_client,
+        monkeypatch,
+        {"end_session_endpoint": ENTRA_LOGOUT},
+        claims={"sub": ENTRA_SUB, "email": "ada@example.org", "login_hint": "opaque-hint"},
+    )
+    response = oidc_client.post("/logout", data={"csrf_token": token})
+    assert response.status_code == 302
+    location = response.headers["location"]
+    assert location.startswith(ENTRA_LOGOUT + "?")
+    assert "post_logout_redirect_uri=https%3A%2F%2Ftestserver%2Flogin" in location
+    assert "logout_hint=opaque-hint" in location
+    # Local session is gone regardless of what the IdP does next
+    assert oidc_client.get("/").status_code == 302
+
+
+def test_logout_falls_back_locally_without_end_session_endpoint(
+    oidc_client, monkeypatch
+):
+    token = _sign_in(oidc_client, monkeypatch, {})
+    response = oidc_client.post("/logout", data={"csrf_token": token})
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login"
+
+
+def test_logout_falls_back_locally_when_metadata_fetch_fails(oidc_client, monkeypatch):
+    token = _sign_in(oidc_client, monkeypatch, {"end_session_endpoint": ENTRA_LOGOUT})
+
+    class _BrokenIdp:
+        async def load_server_metadata(self):
+            raise RuntimeError("issuer unreachable")
+
+    monkeypatch.setattr(oidc_module, "_client", lambda: _BrokenIdp())
+    response = oidc_client.post("/logout", data={"csrf_token": token})
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login"
+    assert oidc_client.get("/").status_code == 302

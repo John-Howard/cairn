@@ -148,16 +148,21 @@ def login_submit(
 
 
 @router.post("/logout")
-def logout(
+async def logout(
     request: Request,
     csrf_token: str = Form(...),
     session: Session = Depends(get_session),
 ):
+    # Imported here: cairn.oidc imports from this module at load time.
+    from cairn.oidc import build_end_session_url
+
     verify_csrf(request, csrf_token)
     user_id = request.session.get("user_id")
+    logout_hint = request.session.get("logout_hint")
     if user_id:
         user = session.get(User, user_id)
         if user is not None:
             record_event(session, entity=user, event="logout", actor=user)
     request.session.clear()
-    return RedirectResponse("/login", status_code=302)
+    end_session_url = await build_end_session_url(request, logout_hint)
+    return RedirectResponse(end_session_url or "/login", status_code=302)

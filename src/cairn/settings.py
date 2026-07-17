@@ -8,6 +8,7 @@ class Settings:
     database_url: str
     session_secret: str
     auth_mode: str
+    log_format: str
     oidc_issuer: str
     oidc_client_id: str
     oidc_client_secret: str
@@ -17,10 +18,14 @@ class Settings:
 
 @lru_cache
 def get_settings() -> Settings:
+    auth_mode = os.environ.get("AUTH_MODE", "dev")
     return Settings(
         database_url=os.environ.get("DATABASE_URL", "sqlite:///cairn.db"),
         session_secret=os.environ.get("SESSION_SECRET", "dev-secret-change-me"),
-        auth_mode=os.environ.get("AUTH_MODE", "dev"),
+        auth_mode=auth_mode,
+        # JSON outside dev (NFRs §6); human-readable text for local work.
+        log_format=os.environ.get("LOG_FORMAT")
+        or ("text" if auth_mode == "dev" else "json"),
         oidc_issuer=os.environ.get("OIDC_ISSUER", ""),
         oidc_client_id=os.environ.get("OIDC_CLIENT_ID", ""),
         oidc_client_secret=os.environ.get("OIDC_CLIENT_SECRET", ""),

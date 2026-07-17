@@ -6,7 +6,9 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from cairn.audit import record_event
 from cairn.db import get_session
+from cairn.logs import security_event
 from cairn.models import Role, User
 from cairn.settings import get_settings
 from cairn.templating import templates
@@ -61,8 +63,32 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
 
 
 def require_role(*roles: Role):
-    def dependency(user: User = Depends(current_user)) -> User:
+    def dependency(
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(get_session),
+    ) -> User:
         if user.role not in roles:
+            # Denied authorisations are recorded (Security Architecture §2/§6).
+            # Commit explicitly: the 403 will roll the request session back.
+            record_event(
+                session,
+                entity=user,
+                event="authorisation_denied",
+                actor=user,
+                new_value={
+                    "path": request.url.path,
+                    "required_roles": sorted(r.value for r in roles),
+                    "actual_role": user.role.value,
+                },
+            )
+            session.commit()
+            security_event(
+                "authorisation_denied",
+                path=request.url.path,
+                required_roles=sorted(r.value for r in roles),
+                actual_role=user.role.value,
+            )
             raise HTTPException(status_code=403, detail="Insufficient role")
         return user
 
@@ -122,7 +148,16 @@ def login_submit(
 
 
 @router.post("/logout")
-def logout(request: Request, csrf_token: str = Form(...)):
+def logout(
+    request: Request,
+    csrf_token: str = Form(...),
+    session: Session = Depends(get_session),
+):
     verify_csrf(request, csrf_token)
+    user_id = request.session.get("user_id")
+    if user_id:
+        user = session.get(User, user_id)
+        if user is not None:
+            record_event(session, entity=user, event="logout", actor=user)
     request.session.clear()
     return RedirectResponse("/login", status_code=302)

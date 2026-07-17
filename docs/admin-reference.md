@@ -18,6 +18,7 @@ All behaviour differences between environments come from environment variables (
 | `OIDC_CLIENT_SECRET` | — | Required when `AUTH_MODE=oidc`. Client secret from the app registration — inject from the estate's secret store, never commit |
 | `SESSION_IDLE_SECONDS` | `3600` | Idle timeout: the session cookie's rolling `max_age`. A user inactive this long is signed out |
 | `SESSION_ABSOLUTE_SECONDS` | `43200` | Absolute session lifetime (12h): however active, a login older than this is expired and the user re-authenticates |
+| `LOG_FORMAT` | `json` (`text` when `AUTH_MODE=dev`) | `json` emits structured JSON lines to stdout (NFRs §6), including uvicorn's own logs; `text` is the human-readable dev format |
 
 Setting up SSO end-to-end (Entra app registration, environment, first login, troubleshooting) is §5.
 
@@ -133,7 +134,6 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 ## 7. Known gaps (deliberate, tracked)
 
 - **Migrations are manual** — neither the image entrypoint nor compose runs `alembic upgrade head` automatically; it is a deliberate deploy step (§3/§4).
-- **JSON structured logging** (NFRs §5) is not yet implemented — logs are uvicorn's default text format on stdout.
 - **Image registry / signed releases / estate IaC** — decided with the first real deployment (`environments-devops.md` §5).
 
 ---

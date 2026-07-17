@@ -14,6 +14,7 @@ from cairn.complaints import router as complaints_router
 from cairn.dashboard import router as dashboard_router
 from cairn.imports import router as imports_router
 from cairn.intake import router as intake_router
+from cairn.logs import configure_logging
 from cairn.oidc import router as oidc_router
 from cairn.regime_policy import router as regime_policy_router
 from cairn.registers import router as registers_router
@@ -28,6 +29,7 @@ GOVUK_ASSETS_DIR = STATIC_DIR / "govuk" / "assets"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(settings.log_format == "json")
     if settings.auth_mode not in ("dev", "oidc"):
         raise RuntimeError(f"Unknown AUTH_MODE: {settings.auth_mode!r}")
     if settings.auth_mode != "dev" and settings.session_secret == "dev-secret-change-me":

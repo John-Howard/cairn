@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Intake — check your answers{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <a href="/intake/{{ submission.id }}/section/{{ sections[0] }}" class="govuk-back-link">Back to the questions</a>
+    <span class="govuk-caption-l">{{ submission.activity_name }} — {{ submission.business_function.label }}</span>
+    <h1 class="govuk-heading-l">Check your answers</h1>
+
+    {% if proposals %}
+    <div class="govuk-inset-text">
+      <p class="govuk-body govuk-!-margin-bottom-1"><strong>New reference values you added</strong> — these will be proposed for the IG team to approve:</p>
+      <ul class="govuk-list govuk-list--bullet govuk-!-margin-bottom-0">
+        {% for key, names in proposals.items() %}<li>{{ names | join(", ") }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if dont_know_codes %}
+    <div class="govuk-inset-text">
+      {{ dont_know_codes | length }} answer{{ "s" if dont_know_codes|length != 1 }} marked "don't know" — recorded as gaps for the IG team to follow up. That's fine: it's more useful than a guess.
+    </div>
+    {% endif %}
+
+    {% set ns = namespace(current="") %}
+    {% for q in questions %}
+    {% if q.section != ns.current %}
+    {% set ns.current = q.section %}
+    <h2 class="govuk-heading-m govuk-!-margin-top-6">{{ q.section_title }} <a class="govuk-link govuk-body-s" href="/intake/{{ submission.id }}/section/{{ q.section }}">Change</a></h2>
+    {% endif %}
+    <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-0">
+      <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key govuk-!-width-two-thirds">{{ q.text }}</dt>
+        <dd class="govuk-summary-list__value">{{ display[q.code] }}</dd>
+      </div>
+    </dl>
+    {% endfor %}
+
+    <div class="govuk-button-group govuk-!-margin-top-6">
+      <form method="post" action="/intake/{{ submission.id }}/submit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="govuk-button" data-module="govuk-button">Submit — create the draft record</button>
+      </form>
+      <form method="post" action="/intake/{{ submission.id }}/cancel">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Cancel this intake</button>
+      </form>
+    </div>
+    <p class="govuk-body-s">Submitting creates a <strong>draft</strong> processing activity for the IG team to curate — nothing is published to the register until it has been reviewed and approved.</p>
+  </div>
+</div>
+{% endblock %}

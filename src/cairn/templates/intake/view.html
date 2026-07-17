@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Intake — {{ submission.activity_name }}{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <a href="/intake" class="govuk-back-link">Back to intake</a>
+    <span class="govuk-caption-l">{{ submission.business_function.label }} — {{ submission.respondent.display_name }}</span>
+    <h1 class="govuk-heading-l">{{ submission.activity_name }}</h1>
+
+    <p class="govuk-body">
+      {% if submission.status.value == "submitted" %}<strong class="govuk-tag govuk-tag--green">Submitted</strong>
+      {% else %}<strong class="govuk-tag govuk-tag--grey">Cancelled</strong>{% endif %}
+      {% if submission.activity_id %}
+      &nbsp;<a class="govuk-link" href="/activities/{{ submission.activity_id }}">Go to the draft activity</a>
+      {% endif %}
+    </p>
+    {% if submission.respondent_contact %}
+    <p class="govuk-body">Follow-up contact: {{ submission.respondent_contact }}</p>
+    {% endif %}
+
+    {% if gaps %}
+    <div class="govuk-inset-text">
+      <p class="govuk-body govuk-!-margin-bottom-1"><strong>Open gaps for IG follow-up</strong></p>
+      <ul class="govuk-list govuk-list--bullet govuk-!-margin-bottom-0">
+        {% for gap in gaps %}<li>{{ gap.question_code }} — {{ gap.question_text }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% set ns = namespace(current="") %}
+    {% for q in questions %}
+    {% if q.section != ns.current %}
+    {% set ns.current = q.section %}
+    <h2 class="govuk-heading-m govuk-!-margin-top-6">{{ q.section_title }}</h2>
+    {% endif %}
+    <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-0">
+      <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key govuk-!-width-two-thirds">{{ q.text }}</dt>
+        <dd class="govuk-summary-list__value">{{ display[q.code] }}</dd>
+      </div>
+    </dl>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

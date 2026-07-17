@@ -11,7 +11,7 @@ Cairn is a single-tenant, internal-facing accountability record: a small user po
 
 ## 2. Authentication (SSO)
 
-- **OIDC Authorization Code + PKCE** against the organisation's IdP (commonly Entra ID in FRS estates). Cairn holds no passwords; **MFA is the IdP's responsibility** and is expected to be enforced there (Cyber Essentials).
+- **OIDC Authorization Code + PKCE** against the organisation's IdP. **Decision (2026-07): Microsoft Entra ID is the confirmed IdP for staging and production**; the dev-login seam (`AUTH_MODE=dev`) remains for local development only and is disabled outside it. Cairn holds no passwords; **MFA is the IdP's responsibility** and is expected to be enforced there (Cyber Essentials).
 - **Server-side sessions** after login: cookie is `Secure`, `HttpOnly`, `SameSite=Lax`; absolute lifetime 12h, idle timeout 60m (configurable per org).
 - **Bootstrap**: first-run setup creates the Organisation Profile and maps an initial `approver_dpo`; thereafter all access is via SSO. No standing local accounts.
 - Login, logout, and failed/denied authorisations are recorded as `AuditEvent` rows — the same table that audits record changes.

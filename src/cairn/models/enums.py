@@ -211,3 +211,19 @@ class ImportBatchStatus(StrEnum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
+
+
+class IntakeAnswerKind(StrEnum):
+    TEXT = "text"
+    TEXTAREA = "textarea"
+    YES_NO = "yes_no"
+    DATE = "date"
+    SINGLE_CHOICE = "single_choice"
+    MULTI_CHOICE = "multi_choice"
+    VOCAB_MULTI = "vocab_multi"
+
+
+class IntakeStatus(StrEnum):
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    CANCELLED = "cancelled"

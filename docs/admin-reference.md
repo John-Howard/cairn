@@ -86,7 +86,7 @@ Applies to staging and production. Dev keeps `AUTH_MODE=dev`; the dev-login scre
 ### 5.1 Entra app registration (once per environment)
 
 1. Microsoft Entra admin center → App registrations → **New registration**. Single-tenant is appropriate; name it per environment (e.g. `Cairn (staging)`).
-2. Add a **Web** redirect URI: `https://<host>/auth/oidc/callback`.
+2. Add a **Web** redirect URI: `https://<host>/auth/oidc/callback`, and a **post-logout redirect URI**: `https://<host>/login` (sign-out returns the user there after ending the Entra session).
 3. Under *Authentication*, ensure **ID tokens** are enabled for the authorization code flow.
 4. Under *Certificates & secrets*, create a **client secret**; record its expiry and put the value in the estate's secret store. **Diary the rotation** — an expired secret stops all logins with `Sign-in … failed` at `/login`.
 5. Note the **Application (client) ID** and the **Directory (tenant) ID**.
@@ -107,6 +107,7 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 - Deactivated users are refused even with a bound subject; reactivation restores access without re-binding.
 - A bound email presented by a **different** subject is refused — an email cannot be reused to take over an account.
 - MFA and conditional access are enforced at the IdP, not in Cairn (Security Architecture §2).
+- **Sign-out is RP-initiated**: it clears Cairn's session, then redirects to Entra's end-session endpoint (with a logout hint, so no account picker) and back to `/login`. If the IdP is unreachable at that moment, sign-out still completes locally.
 
 ### 5.4 Troubleshooting
 

@@ -7,6 +7,8 @@ matches the first login; the token's stable subject is then bound to the user
 so later logins do not depend on the email. No just-in-time provisioning.
 """
 
+from urllib.parse import urlencode
+
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -127,5 +129,30 @@ async def oidc_callback(request: Request, session: Session = Depends(get_session
         return RedirectResponse("/login?error=denied", status_code=302)
     session.info["actor_id"] = user.id
     start_authenticated_session(request, user.id)
+    # Entra's opaque logout_hint lets end-session skip the account picker.
+    if claims.get("login_hint"):
+        request.session["logout_hint"] = claims["login_hint"]
     record_event(session, entity=user, event="login_succeeded", actor=user)
     return RedirectResponse("/", status_code=302)
+
+
+async def build_end_session_url(request: Request, logout_hint: str | None) -> str | None:
+    """RP-initiated logout URL for the IdP, or None to fall back to local logout.
+
+    Never raises: sign-out must succeed locally even if the IdP's discovery
+    document is unreachable at that moment.
+    """
+    if get_settings().auth_mode != "oidc":
+        return None
+    try:
+        metadata = await _client().load_server_metadata()
+    except Exception:
+        security_event("oidc_end_session_metadata_unavailable")
+        return None
+    endpoint = metadata.get("end_session_endpoint")
+    if not endpoint:
+        return None
+    params = {"post_logout_redirect_uri": str(request.url_for("login_form"))}
+    if logout_hint:
+        params["logout_hint"] = logout_hint
+    return f"{endpoint}?{urlencode(params)}"

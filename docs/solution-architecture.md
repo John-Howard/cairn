@@ -52,7 +52,7 @@ flowchart TD
         REG["Regime operations<br/>(policy cascade, override)<br/><i>regime.py</i>"]
         RULES["Profile-conditioned rule engine<br/><i>rules.py</i>"]
         EXPORT["Export mapping layer<br/>Art 30(1)/(2) · s61 · combined<br/><i>export.py</i>"]
-        WF["Workflow & questionnaire ingestion<br/><i>vocabularies.py · imports.py · complaints.py</i>"]
+        WF["Workflow, intake & questionnaire ingestion<br/><i>vocabularies.py · intake.py · imports.py · complaints.py</i>"]
     end
     subgraph domain["Domain & persistence"]
         MODELS["Entity model + junctions<br/><i>models/</i>"]

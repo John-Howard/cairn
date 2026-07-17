@@ -26,7 +26,7 @@ uv run uvicorn cairn.web:app --reload    # start on http://127.0.0.1:8000
 
 Stop with `Ctrl-C`. Quality gates (same as CI): `uv run ruff check .` and `uv run pytest -q`.
 
-- **First run:** with an empty database, visiting `/` redirects to the `/setup` wizard, which creates the Organisation Profile, seeds the legal and FRS vocabularies, and creates the bootstrap `approver_dpo` user (logged in immediately). `/setup` returns 404 once a profile exists.
+- **First run:** with an empty database, visiting `/` redirects to the `/setup` wizard, which creates the Organisation Profile, seeds the legal and FRS vocabularies (including the intake question set), and creates the bootstrap `approver_dpo` user (logged in immediately). `/setup` returns 404 once a profile exists.
 - **Logging in:** `/login` lists active users; pick one (no password — dev mode only). Create further users at `/users` (approver only).
 - **Resetting dev:** stop the server, delete `cairn.db`, run `uv run alembic upgrade head`, restart and go through `/setup` again.
 

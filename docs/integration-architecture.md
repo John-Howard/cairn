@@ -24,10 +24,10 @@ Three rules apply to every interface, present or future:
 | 3 | Asset register / CMDB | inbound reference | Manual curation of `SystemAsset` by IG/ICT | CSV import; scheduled sync if the estate has an authoritative CMDB | 2c |
 | 4 | Privacy notices | outbound by reference | `PrivacyNotice` holds version/date/ref; notice text lives where published (org website) | link-checker on published URLs | 2c |
 | 5 | Complaints intake (DUAA s164A) | inbound | Manual entry by IG team from the org's existing channels (web form, email); `received_at` starts the 30-day clock regardless of channel | minimal authenticated intake endpoint the org's public web form posts to | 2f |
-| 6 | Questionnaire ingestion | inbound | Distribute via the org's own tools (e.g. MS Forms); export answers → **mapped CSV/JSON import** creating pre-tagged draft activities | direct form integration if volume justifies it | 2d |
+| 6 | Questionnaire ingestion | inbound | **In-app intake wizard** (primary — the question set is seeded configuration; each run creates a draft activity with junction links, vocabulary proposals and "don't know" gap records worked through at `/intake/gaps`); **mapped CSV import** retained for bulk/offline capture | direct form integration if volume justifies it | 2d |
 | 7 | ICO / assurance exports | outbound | On-demand generated files (CSV/XLSX) from the mapping layer — Art 30(1), Art 30(2), s61, combined views | PDF rendering; read-only JSON API for BI tooling | 2e |
 | 8 | Notifications (overdue review, trial expiry, complaint acknowledgement due) | outbound | Estate SMTP relay; email is advisory — the dashboard is authoritative | Teams/webhook connector | 2e |
-| 9 | ROPA migration (Phase 4) | one-off inbound | Spreadsheet → mapped import through the same draft-creating import path as #6 | — | Phase 4 |
+| 9 | ROPA migration (Phase 4) | one-off inbound | Spreadsheet → mapped import through #6's CSV path; reconciliation against audit-derived records (Project Plan v0.2 Phase 4) | — | Phase 4 |
 
 ## 3. The two integrations that need design care
 

@@ -17,6 +17,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `docs/non-functional-requirements.md` — **NFRs v0.1** (Phase 1.5). Honest sizing (tens of users, small DB), integrity > confidentiality > availability, RPO ≤ 24h / RTO ≤ 1 business day, retention of Cairn's own data (users deactivated never deleted, audit outlives records), JSON logs with no personal data, /healthz.
 - `docs/environments-devops.md` — **Environments & DevOps v0.1** (Phase 1.6). Dev/staging/prod environments (one image, config-only differences), CI gates, tag-based releases with forward-only migrations, backup/restore-test/DR runbooks, and what's deferred (Alembic to 2a, registry/IaC to first deployment).
 
+`docs/Cairn-backlog.md` — **Backlog v0.1** — is the forward-looking record: known gaps (with a before-staging shortlist, e.g. session-lifetime enforcement), pilot-dependent items, and future enhancements, with a suggested order of attack. Check it before starting new work.
+
 When starting implementation, treat the field spec as authoritative for entities, fields, types, and validation rules; consult the plan for the reasoning behind a decision; consult the project plan for phase sequencing and scope-of-phase. The spec tags any field-level decision that refines the plan with `[spec clarification]` — these never contradict the plan.
 
 **Naming:** the system is **Cairn**. The plan and spec still carry the working "ROPA Tool" branding; applying the Cairn name across them is a deferred Phase 0 step, so expect both names in the docs for now.

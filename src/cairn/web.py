@@ -1,8 +1,10 @@
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
 import cairn
@@ -12,6 +14,7 @@ from cairn.auth import router as auth_router
 from cairn.basis import router as basis_router
 from cairn.complaints import router as complaints_router
 from cairn.dashboard import router as dashboard_router
+from cairn.db import get_engine
 from cairn.imports import router as imports_router
 from cairn.intake import router as intake_router
 from cairn.logs import configure_logging
@@ -80,7 +83,20 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz")
     def healthz():
-        return {"status": "ok", "version": cairn.__version__}
+        # App up + DB reachable (NFRs §6). Only the exception class is logged —
+        # SQLAlchemy error text can carry connection-string details.
+        try:
+            with get_engine().connect() as conn:
+                conn.execute(text("SELECT 1"))
+        except Exception as exc:
+            logging.getLogger("cairn.health").error(
+                "healthz database check failed: %s", type(exc).__name__
+            )
+            return JSONResponse(
+                {"status": "degraded", "database": "unreachable", "version": cairn.__version__},
+                status_code=503,
+            )
+        return {"status": "ok", "database": "ok", "version": cairn.__version__}
 
     app.include_router(auth_router)
     app.include_router(oidc_router)

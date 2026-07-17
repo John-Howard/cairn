@@ -45,7 +45,7 @@ Stop with `Ctrl-C`. Quality gates (same as CI): `uv run ruff check .` and `uv ru
 ```sh
 docker compose up -d --build             # build image, start app (:8000) + postgres
 docker compose run --rm app alembic upgrade head    # apply migrations (not automatic)
-curl http://localhost:8000/healthz       # {"status": "ok", "version": …}
+curl http://localhost:8000/healthz       # {"status": "ok", "database": "ok", "version": …}
 ```
 
 | Task | Command |
@@ -71,7 +71,7 @@ Production runs the **same image** on the organisation's estate; TLS termination
 2. Pull the new image and run migrations first:
    `docker run --rm -e DATABASE_URL=… cairn:X.Y.Z alembic upgrade head`
 3. Replace the running container with the new image (estate orchestration or `docker stop`/`docker run`).
-4. Verify `GET /healthz` returns `{"status": "ok", "version": "X.Y.Z"}` — the version in the response confirms the right image is live. The image also carries a Docker `HEALTHCHECK` polling `/healthz` every 30s.
+4. Verify `GET /healthz` returns `{"status": "ok", "database": "ok", "version": "X.Y.Z"}` — the version confirms the right image is live and `database` confirms the app can reach PostgreSQL (a 503 `degraded` response means it cannot). The image also carries a Docker `HEALTHCHECK` polling `/healthz` every 30s.
 
 **Rollback:** redeploy the previous tag. **Migrations are forward-only** — never downgrade the schema in staging or production; a bad release rolls the app back one version (migrations are written to be backwards-compatible by one version), and a schema fix goes forward as a new migration.
 
@@ -122,7 +122,7 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 
 | Task | How |
 |---|---|
-| Health / liveness | `GET /healthz` (no auth) — status + running version |
+| Health / liveness | `GET /healthz` (no auth) — status, DB reachability and running version; 503 `degraded` when the database is unreachable |
 | User admin | `/users` (approver_dpo only): create, edit roles/functions, deactivate/reactivate. Users are **deactivated, never deleted** (NFRs) — deactivation blocks login, ends live sessions and removes them from pickers |
 | Locked out / no approver | If the only approver is deactivated by DB mishap: set `is_active` back to true directly in the database (`UPDATE "user" SET is_active = true WHERE id = …`) — the app deliberately prevents self-deactivation to avoid this |
 | Backups | Daily `pg_dump` / managed-service backup; 35 days rolling + 12 monthly (NFRs §4). SQLite dev DB is disposable, never backed up |

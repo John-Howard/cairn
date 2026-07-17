@@ -12,6 +12,9 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      SESSION_IDLE_SECONDS: ${SESSION_IDLE_SECONDS:-3600}
+      SESSION_ABSOLUTE_SECONDS: ${SESSION_ABSOLUTE_SECONDS:-43200}
+      LOG_FORMAT: ${LOG_FORMAT:-}
     depends_on:
       db:
         condition: service_healthy

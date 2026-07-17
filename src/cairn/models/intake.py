@@ -58,5 +58,6 @@ class IntakeGap(AuditedBase):
     question_code: Mapped[str]
     question_text: Mapped[str] = mapped_column(Text)
     resolved: Mapped[bool] = mapped_column(default=False)
+    resolution_note: Mapped[str | None] = mapped_column(Text)
 
     submission: Mapped[IntakeSubmission] = relationship(back_populates="gaps")

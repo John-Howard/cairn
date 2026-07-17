@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Intake gaps{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <a href="/intake" class="govuk-back-link">Back to intake</a>
+    <h1 class="govuk-heading-l">Intake gaps</h1>
+    <p class="govuk-body">Every "don't know" recorded during intake, for IG follow-up. Resolve each gap after the interview or document review that answered it — record what was established, then apply the substance to the draft activity itself.</p>
+    <p class="govuk-body"><strong class="govuk-tag {% if open_count %}govuk-tag--red{% else %}govuk-tag--green{% endif %}">{{ open_count }} open</strong></p>
+  </div>
+</div>
+
+{% for group in open_groups %}
+{% set s = group.submission %}
+<div class="govuk-summary-card">
+  <div class="govuk-summary-card__title-wrapper">
+    <h2 class="govuk-summary-card__title">{{ s.activity_name }} — {{ s.business_function.label }}</h2>
+    <ul class="govuk-summary-card__actions">
+      <li class="govuk-summary-card__action"><a class="govuk-link" href="/intake/{{ s.id }}">Intake answers</a></li>
+      {% if s.activity_id %}
+      <li class="govuk-summary-card__action"><a class="govuk-link" href="/activities/{{ s.activity_id }}">Draft activity</a></li>
+      {% endif %}
+    </ul>
+  </div>
+  <div class="govuk-summary-card__content">
+    <p class="govuk-body-s">Respondent: {{ s.respondent.display_name }}{% if s.respondent_contact %} — {{ s.respondent_contact }}{% endif %}</p>
+    {% for gap in group.gaps %}
+    <div class="govuk-form-group govuk-!-margin-bottom-4">
+      <h3 class="govuk-heading-s govuk-!-margin-bottom-1">{{ gap.question_code }} — {{ gap.question_text }}</h3>
+      <form method="post" action="/intake/gaps/{{ gap.id }}/resolve">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="govuk-label govuk-label--s" for="note-{{ gap.id }}">What did the follow-up establish?</label>
+        <textarea class="govuk-textarea" id="note-{{ gap.id }}" name="resolution_note" rows="2"></textarea>
+        <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Mark resolved</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="govuk-body">No open gaps — every "don't know" has been followed up.</p>
+{% endfor %}
+
+{% if resolved %}
+<h2 class="govuk-heading-m govuk-!-margin-top-6">Resolved</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Question</th>
+      <th scope="col" class="govuk-table__header">Resolution</th>
+      <th scope="col" class="govuk-table__header"></th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for gap in resolved %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ gap.submission_id }}">{{ gap.submission.activity_name }}</a></td>
+      <td class="govuk-table__cell">{{ gap.question_code }} — {{ gap.question_text }}</td>
+      <td class="govuk-table__cell">{{ gap.resolution_note }}</td>
+      <td class="govuk-table__cell">
+        <form method="post" action="/intake/gaps/{{ gap.id }}/reopen">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">Reopen</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

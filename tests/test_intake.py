@@ -304,6 +304,137 @@ def test_cancel_and_resubmit_guards(activities_client, activities_web_engine):
     assert response.status_code == 422
 
 
+def _submission_with_gaps(client, engine, *, name="Gappy activity") -> tuple[str, str]:
+    """Create and submit an intake with two don't-know answers; return (submission, activity)."""
+    submission_id = _start(client, engine, name=name)
+    _save_section(client, submission_id, "C", {"C1": "A purpose.", "C3__dk": "1"})
+    _save_section(client, submission_id, "H", {"H3__dk": "1"})
+    activity_id = _submit(client, submission_id)
+    return submission_id, activity_id
+
+
+def test_gaps_queue_requires_curator(activities_client, activities_web_engine):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    assert client.get("/intake/gaps").status_code == 403
+    _login(client, engine, "Cara Curator")
+    assert client.get("/intake/gaps").status_code == 200
+
+
+def test_resolve_and_reopen_gap(activities_client, activities_web_engine):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, activity_id = _submission_with_gaps(client, engine)
+
+    _login(client, engine, "Cara Curator")
+    page = client.get("/intake/gaps")
+    assert "Gappy activity" in page.text
+    assert "C3" in page.text and "H3" in page.text
+    token = _extract_csrf(page.text)
+
+    with Session(engine) as db:
+        gap = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "C3",
+            )
+        ).one()
+        gap_id = gap.id
+
+    # Resolving without a note is rejected
+    response = client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={"csrf_token": token, "resolution_note": "  "},
+    )
+    assert response.status_code == 422
+
+    response = client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={
+            "csrf_token": token,
+            "resolution_note": "Interview 21/07: FRSA 2004 s6 duty confirmed by legal.",
+        },
+    )
+    assert response.status_code == 302
+    with Session(engine) as db:
+        gap = db.get(IntakeGap, gap_id)
+        assert gap.resolved
+        assert "FRSA 2004" in gap.resolution_note
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_id == gap_id,
+                AuditEvent.event == "intake_gap_resolved",
+            )
+        ).all()
+        assert len(events) == 1
+        assert "FRSA 2004" in events[0].reason
+
+    # Resolved gap shows in the resolved table, open queue shrinks; double-resolve blocked
+    page = client.get("/intake/gaps")
+    assert "FRSA 2004 s6 duty confirmed" in page.text
+    response = client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={"csrf_token": token, "resolution_note": "again"},
+    )
+    assert response.status_code == 422
+
+    response = client.post(f"/intake/gaps/{gap_id}/reopen", data={"csrf_token": token})
+    assert response.status_code == 302
+    with Session(engine) as db:
+        gap = db.get(IntakeGap, gap_id)
+        assert not gap.resolved
+        assert gap.resolution_note is None
+        assert (
+            db.scalars(
+                select(AuditEvent).where(
+                    AuditEvent.entity_id == gap_id,
+                    AuditEvent.event == "intake_gap_reopened",
+                )
+            ).one()
+            is not None
+        )
+
+
+def test_contributor_cannot_resolve_gaps(activities_client, activities_web_engine):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, _activity_id = _submission_with_gaps(
+        client, engine, name="Contributor-owned gaps"
+    )
+    with Session(engine) as db:
+        gap_id = db.scalars(
+            select(IntakeGap).where(IntakeGap.submission_id == submission_id)
+        ).first().id
+    token = _page_csrf(client, "/intake")
+    response = client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={"csrf_token": token, "resolution_note": "sneaky self-resolution"},
+    )
+    assert response.status_code == 403
+
+
+def test_submission_view_shows_gap_status(activities_client, activities_web_engine):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, _activity_id = _submission_with_gaps(client, engine, name="Status check")
+    _login(client, engine, "Cara Curator")
+    token = _page_csrf(client, "/intake/gaps")
+    with Session(engine) as db:
+        gap_id = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "H3",
+            )
+        ).one().id
+    client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={"csrf_token": token, "resolution_note": "Retention is 6 years per policy DP-4."},
+    )
+    page = client.get(f"/intake/{submission_id}")
+    assert "Resolved" in page.text and "Open" in page.text
+    assert "Retention is 6 years per policy DP-4." in page.text
+
+
 def test_existing_label_in_new_box_links_instead_of_proposing(
     activities_client, activities_web_engine
 ):

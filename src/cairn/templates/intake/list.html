@@ -6,6 +6,9 @@
     <h1 class="govuk-heading-l">Information audit intake</h1>
     <p class="govuk-body">Record one intake per <strong>activity</strong> — each distinct thing your team does with information about people. A department will usually complete this several times. "Don't know" is a valid answer; the IG team will follow up.</p>
     <a href="/intake/new" class="govuk-button" data-module="govuk-button">Start a new intake</a>
+    {% if user.role.value in ("curator", "approver_dpo") %}
+    <p class="govuk-body"><a class="govuk-link" href="/intake/gaps">Work through open intake gaps</a></p>
+    {% endif %}
   </div>
 </div>
 

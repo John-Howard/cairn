@@ -1,6 +1,6 @@
 # Cairn — System Administration Reference
 
-**Status:** Admin Reference v0.1. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
+**Status:** Admin Reference v0.2. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
 
 ---
 
@@ -18,6 +18,7 @@ All behaviour differences between environments come from environment variables (
 | `OIDC_CLIENT_SECRET` | — | Required when `AUTH_MODE=oidc`. Client secret from the app registration — inject from the estate's secret store, never commit |
 | `SESSION_IDLE_SECONDS` | `3600` | Idle timeout: the session cookie's rolling `max_age`. A user inactive this long is signed out |
 | `SESSION_ABSOLUTE_SECONDS` | `43200` | Absolute session lifetime (12h): however active, a login older than this is expired and the user re-authenticates |
+| `LOG_FORMAT` | `json` (`text` when `AUTH_MODE=dev`) | `json` emits structured JSON lines to stdout (NFRs §6), including uvicorn's own logs; `text` is the human-readable dev format |
 
 Setting up SSO end-to-end (Entra app registration, environment, first login, troubleshooting) is §5.
 
@@ -44,7 +45,7 @@ Stop with `Ctrl-C`. Quality gates (same as CI): `uv run ruff check .` and `uv ru
 ```sh
 docker compose up -d --build             # build image, start app (:8000) + postgres
 docker compose run --rm app alembic upgrade head    # apply migrations (not automatic)
-curl http://localhost:8000/healthz       # {"status": "ok", "version": …}
+curl http://localhost:8000/healthz       # {"status": "ok", "database": "ok", "version": …}
 ```
 
 | Task | Command |
@@ -70,7 +71,7 @@ Production runs the **same image** on the organisation's estate; TLS termination
 2. Pull the new image and run migrations first:
    `docker run --rm -e DATABASE_URL=… cairn:X.Y.Z alembic upgrade head`
 3. Replace the running container with the new image (estate orchestration or `docker stop`/`docker run`).
-4. Verify `GET /healthz` returns `{"status": "ok", "version": "X.Y.Z"}` — the version in the response confirms the right image is live. The image also carries a Docker `HEALTHCHECK` polling `/healthz` every 30s.
+4. Verify `GET /healthz` returns `{"status": "ok", "database": "ok", "version": "X.Y.Z"}` — the version confirms the right image is live and `database` confirms the app can reach PostgreSQL (a 503 `degraded` response means it cannot). The image also carries a Docker `HEALTHCHECK` polling `/healthz` every 30s.
 
 **Rollback:** redeploy the previous tag. **Migrations are forward-only** — never downgrade the schema in staging or production; a bad release rolls the app back one version (migrations are written to be backwards-compatible by one version), and a schema fix goes forward as a new migration.
 
@@ -121,7 +122,7 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 
 | Task | How |
 |---|---|
-| Health / liveness | `GET /healthz` (no auth) — status + running version |
+| Health / liveness | `GET /healthz` (no auth) — status, DB reachability and running version; 503 `degraded` when the database is unreachable |
 | User admin | `/users` (approver_dpo only): create, edit roles/functions, deactivate/reactivate. Users are **deactivated, never deleted** (NFRs) — deactivation blocks login, ends live sessions and removes them from pickers |
 | Locked out / no approver | If the only approver is deactivated by DB mishap: set `is_active` back to true directly in the database (`UPDATE "user" SET is_active = true WHERE id = …`) — the app deliberately prevents self-deactivation to avoid this |
 | Backups | Daily `pg_dump` / managed-service backup; 35 days rolling + 12 monthly (NFRs §4). SQLite dev DB is disposable, never backed up |
@@ -133,7 +134,6 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 ## 7. Known gaps (deliberate, tracked)
 
 - **Migrations are manual** — neither the image entrypoint nor compose runs `alembic upgrade head` automatically; it is a deliberate deploy step (§3/§4).
-- **JSON structured logging** (NFRs §5) is not yet implemented — logs are uvicorn's default text format on stdout.
 - **Image registry / signed releases / estate IaC** — decided with the first real deployment (`environments-devops.md` §5).
 
 ---

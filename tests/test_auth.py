@@ -82,17 +82,27 @@ def test_inactive_user_excluded_from_login_and_rejected(seeded_client, seeded_we
     assert response.status_code == 400
 
 
-def test_require_role_allows_matching_role():
+class _StubURL:
+    path = "/stub"
+
+
+class _StubRequest:
+    url = _StubURL()
+
+
+def test_require_role_allows_matching_role(session):
     dependency = require_role(Role.APPROVER_DPO)
     approver = User(display_name="Ada", role=Role.APPROVER_DPO)
-    assert dependency(user=approver) is approver
+    assert dependency(_StubRequest(), user=approver, session=session) is approver
 
 
-def test_require_role_denies_other_roles():
+def test_require_role_denies_other_roles(session):
     dependency = require_role(Role.APPROVER_DPO)
     viewer = User(display_name="Vic", role=Role.VIEWER)
+    session.add(viewer)
+    session.flush()
     try:
-        dependency(user=viewer)
+        dependency(_StubRequest(), user=viewer, session=session)
         raised = False
     except Exception as exc:
         raised = True

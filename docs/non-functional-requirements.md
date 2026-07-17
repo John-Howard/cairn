@@ -60,7 +60,7 @@ Cairn documents retention for the organisation; it must also practise it. These 
 
 ## 6. Logging & monitoring
 
-- **Structured JSON logs to stdout**, collected by the estate's aggregation — no log files in the container, no bespoke stack.
+- **Structured JSON logs to stdout**, collected by the estate's aggregation — no log files in the container, no bespoke stack. *(Implemented 2026-07: `src/cairn/logs.py`, `LOG_FORMAT=json` outside dev; security events carry structured fields via `cairn.security`.)*
 - **No personal data in logs**: log record IDs and event types, never field contents; exception messages scrubbed. (The audit trail in the database, not the log stream, is the forensic record.)
 - **`/healthz`** endpoint (app up + DB reachable) for the estate's probes.
 - Estate-level alerts on: service down, sustained 5xx rate, backup job failure, disk/storage thresholds. Application-level signals (overdue reviews, trial expiry, complaint acknowledgement due) are **dashboards and notifications for users, not ops alerts** (Integration Architecture #8).

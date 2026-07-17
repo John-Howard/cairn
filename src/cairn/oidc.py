@@ -7,8 +7,6 @@ matches the first login; the token's stable subject is then bound to the user
 so later logins do not depend on the email. No just-in-time provisioning.
 """
 
-import logging
-
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -18,10 +16,9 @@ from sqlalchemy.orm import Session
 from cairn.audit import record_event
 from cairn.auth import start_authenticated_session
 from cairn.db import get_session
+from cairn.logs import security_event
 from cairn.models import User
 from cairn.settings import get_settings
-
-logger = logging.getLogger("cairn.oidc")
 
 router = APIRouter()
 
@@ -116,16 +113,16 @@ async def oidc_callback(request: Request, session: Session = Depends(get_session
     try:
         token = await _client().authorize_access_token(request)
     except OAuthError as exc:
-        logger.warning("oidc token exchange failed: %s", exc.error)
+        security_event("oidc_exchange_failed", error=str(exc.error))
         return RedirectResponse("/login?error=exchange_failed", status_code=302)
     claims = token.get("userinfo") or {}
     try:
         user = resolve_oidc_user(session, claims)
     except OIDCDenied as exc:
-        # Unknown identities have no User row to audit against; the JSON log
-        # carries the denial (subject only — no email in logs, per NFR §logging).
-        logger.warning(
-            "oidc login denied: %s (subject=%s)", exc.reason, claims.get("sub")
+        # Unknown identities have no User row to audit against; the structured
+        # log carries the denial (subject only — no email, per NFRs §6).
+        security_event(
+            "oidc_login_denied", reason=exc.reason, subject=claims.get("sub")
         )
         return RedirectResponse("/login?error=denied", status_code=302)
     session.info["actor_id"] = user.id

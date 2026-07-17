@@ -1,6 +1,6 @@
 # Cairn — System Administration Reference
 
-**Status:** Admin Reference v0.1. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
+**Status:** Admin Reference v0.2. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
 
 ---
 

@@ -16,8 +16,9 @@ Phases 1–2 complete and extended: the full application (2a–2f) plus the pull
 | OIDC SSO | Authorization Code + PKCE against Entra ID; deny-by-default mapping (email first login → audited subject binding); startup config validation; secure cookies |
 | Pilot runway | P1 seeding checklist, P2 dry-run script, communications pack — each linked from the pilot plan's stage table |
 | Documentation | All architecture docs, admin reference (incl. §5 SSO runbook), product descriptions and doc indexes audited current |
+| Security hardening (added post-retrospective, PRs #12–#14) | Session lifetime enforcement (12h absolute / 60m idle), JSON structured logging with security events, RBAC denial + logout auditing, healthz DB-reachability check, RP-initiated logout to the IdP |
 
-Test suite 282 passing; CI green throughout. **Remaining work before go-live is operational (staging stand-up, pilot execution) and assurance (Phase 3) — plus the items below.**
+Test suite 294 passing; CI green throughout. **Remaining work before go-live is operational (staging stand-up, pilot execution) and assurance (Phase 3) — plus the items below.**
 
 ## 2. Gaps to close before or during staging *(ordered by risk)*
 
@@ -63,8 +64,8 @@ Test suite 282 passing; CI green throughout. **Remaining work before go-live is 
 
 | When | Items |
 |---|---|
-| Before staging holds real data | 1 session lifetime · 3 RBAC denial audit · 4 JSON logging · 6 DPIA delta |
-| At first staging deployment | 5 Entra round-trip verification · 2 logout decision |
+| Before staging holds real data | 6 DPIA delta *(1, 3, 4 done 2026-07-17)* |
+| At first staging deployment | 5 Entra round-trip verification *(2 done 2026-07-17)* |
 | During pilot (as evidence arrives) | 7–13 |
 | Before go-live | Phase 3 items (§5) · 14 notifications |
 | Post go-live / roadmap | 15–23 |

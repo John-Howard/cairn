@@ -32,7 +32,7 @@ It is a **full integrated accountability record**, not just a register — ROPA,
 - **Relational, not flat** — granularity lives in the model, so the register survives contact with reality instead of collapsing into an unmaintainable sheet.
 - **Reversible and audited** — versioning, change notes and an append-only audit posture mean every change is recoverable and every decision is evidenced.
 - **Configurable, not bespoke** — one codebase, tailored by profile. Adopting Cairn for a new sector means seeding a pack, not rebuilding the tool.
-- **Cloud-agnostic and self-hosted** — FastAPI, the GOV.UK Design System and PostgreSQL, deployed as a container in your own estate, with OIDC single sign-on and deny-by-default role-based access.
+- **Cloud-agnostic and self-hosted** — FastAPI, the GOV.UK Design System and PostgreSQL, deployed as a container in your own estate. Single sign-on through your identity provider (Microsoft Entra ID ready, any OIDC provider works), no passwords held, MFA enforced at the IdP, and deny-by-default role-based access.
 - **Legally grounded** — vocabularies and rules trace back to specific legislation and ICO guidance, and are maintained against amendments as the law changes.
 
 ---

@@ -19,7 +19,7 @@ Three rules apply to every interface, present or future:
 
 | # | Integration | Direction | v1 mechanism | Future option | Sub-phase |
 |---|-------------|-----------|--------------|---------------|-----------|
-| 1 | Identity provider (SSO) | inbound auth | OIDC (Security Architecture §2) | — | 2a |
+| 1 | Identity provider (SSO) | inbound auth | OIDC, Authorization Code + PKCE — implemented (`src/cairn/oidc.py`; Entra ID confirmed; Security Architecture §2, Admin Reference §5) | — | done |
 | 2 | External Data Sources (Acorn, Adult Care, NHS…) | none — records only | Curated `ExternalDataSource` entries; the datasets themselves **never enter Cairn** | none intended | done (1.2) |
 | 3 | Asset register / CMDB | inbound reference | Manual curation of `SystemAsset` by IG/ICT | CSV import; scheduled sync if the estate has an authoritative CMDB | 2c |
 | 4 | Privacy notices | outbound by reference | `PrivacyNotice` holds version/date/ref; notice text lives where published (org website) | link-checker on published URLs | 2c |

@@ -35,7 +35,7 @@ Nothing else is required at go-live: no message queue, no cache, no object store
 | UI | Jinja2 + htmx, GOV.UK Design System | Forms-heavy CRUD with progressive enhancement; accessibility largely solved at the component level; no frontend build chain |
 | ORM / DB | SQLAlchemy 2 → PostgreSQL (prod), SQLite (dev/test) | Kernel already validated on it; the versioning listener (rule 17) lives here |
 | Migrations | Alembic from sub-phase 2a | Schema now stable enough; PostgreSQL target fixed |
-| AuthN | OIDC to the organisation's IdP (commonly Entra ID in FRS estates); server-side sessions | SSO is a Phase 1.3 requirement; OIDC keeps it estate-agnostic |
+| AuthN | OIDC to the organisation's IdP — Microsoft Entra ID confirmed; implemented in `src/cairn/oidc.py` (`AUTH_MODE=oidc`, Authorization Code + PKCE); signed-cookie sessions | SSO is a Phase 1.3 requirement; OIDC keeps it estate-agnostic |
 | AuthZ | The four Plan §5.1 roles, mapped from IdP groups at login | RBAC detail in Phase 1.3 |
 | Packaging | OCI containers (Dockerfile, docker-compose reference) | The hosting-posture decision |
 | Tooling | uv, pytest, ruff | Established |

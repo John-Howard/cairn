@@ -17,7 +17,7 @@ All behaviour differences between environments come from environment variables (
 | `OIDC_CLIENT_ID` | — | Required when `AUTH_MODE=oidc`. The Entra app registration's application (client) ID |
 | `OIDC_CLIENT_SECRET` | — | Required when `AUTH_MODE=oidc`. Client secret from the app registration — inject from the estate's secret store, never commit |
 
-**OIDC / Entra notes (staging & production):** the app registration needs a **web** redirect URI of `https://<host>/auth/oidc/callback` and ID tokens enabled; Cairn requests `openid profile email` with Authorization Code + PKCE. In `oidc` mode the session cookie is marked `Secure`, so the app must be served over HTTPS. Sign-in is **deny-by-default**: a user must already exist in Cairn (created at `/users`) with an **email matching their IdP sign-in address**; on first login the token's subject is bound to the account (audited), and later logins match by subject. Unknown or deactivated identities are redirected back to `/login` and the denial is written to the JSON log (subject only, no personal data). MFA is enforced at the IdP, not in Cairn.
+Setting up SSO end-to-end (Entra app registration, environment, first login, troubleshooting) is §5.
 
 ## 2. Development
 
@@ -56,7 +56,7 @@ curl http://localhost:8000/healthz       # {"status": "ok", "version": …}
 | Database shell | `docker compose exec db psql -U cairn cairn` |
 | Ad-hoc backup | `docker compose exec db pg_dump -U cairn cairn > backup.sql` |
 
-The compose file sets `DATABASE_URL` for the app service; add `SESSION_SECRET` (and, once OIDC exists, the auth configuration) via an override file or estate secret store rather than editing the checked-in file.
+The compose file sets `DATABASE_URL` and passes through `AUTH_MODE`, `SESSION_SECRET` and the `OIDC_*` variables from the host environment (defaulting to dev auth). Supply real values via an override file or the estate's secret store rather than editing the checked-in file; SSO setup is §5.
 
 ## 4. Production
 
@@ -74,7 +74,48 @@ Production runs the **same image** on the organisation's estate; TLS termination
 
 **Stop:** stop the container via the estate's orchestration. The application is stateless apart from the database — signed cookies mean no session store, so containers can be stopped/replaced freely; in-flight requests aside, there is no drain procedure.
 
-## 5. Routine management
+## 5. Enabling SSO (OIDC / Microsoft Entra ID)
+
+Applies to staging and production. Dev keeps `AUTH_MODE=dev`; the dev-login screen and the SSO routes are mutually exclusive — each 404s in the other mode.
+
+**Before you start:** the app must be served over **HTTPS** (in `oidc` mode the session cookie is `Secure`, so sign-in cannot complete over plain HTTP), and you need rights to create an app registration in the tenant.
+
+### 5.1 Entra app registration (once per environment)
+
+1. Microsoft Entra admin center → App registrations → **New registration**. Single-tenant is appropriate; name it per environment (e.g. `Cairn (staging)`).
+2. Add a **Web** redirect URI: `https://<host>/auth/oidc/callback`.
+3. Under *Authentication*, ensure **ID tokens** are enabled for the authorization code flow.
+4. Under *Certificates & secrets*, create a **client secret**; record its expiry and put the value in the estate's secret store. **Diary the rotation** — an expired secret stops all logins with `Sign-in … failed` at `/login`.
+5. Note the **Application (client) ID** and the **Directory (tenant) ID**.
+
+Cairn requests `openid profile email` with Authorization Code + PKCE; no API permissions beyond the default `User.Read`-less OIDC scopes are needed, and no admin consent beyond sign-in.
+
+### 5.2 Configure and switch over
+
+1. **Provision users first.** Sign-in is deny-by-default: a user must already exist in Cairn with an **email matching their IdP sign-in address**. Check `/users` — anyone without an email (shown as —) cannot use SSO. In particular make sure **your own approver_dpo account has its email set before switching modes**, or nobody will be able to administer the instance (recovery: temporarily set `AUTH_MODE=dev` on a trusted network).
+2. Set the environment (override file / secret store):
+   `AUTH_MODE=oidc`, a strong `SESSION_SECRET`, `OIDC_ISSUER=https://login.microsoftonline.com/<tenant-id>/v2.0`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`.
+3. Restart the app. It **refuses to start** if any `OIDC_*` value is missing — a half-configured instance never comes up open.
+4. Verify: `/login` now shows "Sign in with your organisation account"; sign in as the DPO. The first login **binds the token's subject to the account** (audited `oidc_subject_bound`); later logins match by subject, so the account survives an email change at the IdP.
+
+### 5.3 How identity mapping behaves (summary)
+
+- No just-in-time provisioning: a valid Entra token for a person **not** in Cairn signs in nobody — they see "Your account isn't set up in Cairn" and the denial is logged to stdout (subject only; no personal data in logs).
+- Deactivated users are refused even with a bound subject; reactivation restores access without re-binding.
+- A bound email presented by a **different** subject is refused — an email cannot be reused to take over an account.
+- MFA and conditional access are enforced at the IdP, not in Cairn (Security Architecture §2).
+
+### 5.4 Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| App exits at startup: `AUTH_MODE=oidc requires: …` | Missing `OIDC_*` variable — set all three |
+| "Your account isn't set up in Cairn" | No Cairn user with that email, email mismatch (check `/users`), or user deactivated |
+| "Sign-in with your organisation account failed" | Redirect URI mismatch in the app registration, expired/rotated client secret, or wrong tenant in `OIDC_ISSUER` |
+| Sign-in loops back to `/login` with no error | App served over plain HTTP — the `Secure` session cookie is being dropped; fix TLS in front of the container |
+| Wrong person signed into an account | Should not be possible (subject binding); verify the audit trail (`oidc_subject_bound`, `login_succeeded` events) and the user's email assignment history |
+
+## 6. Routine management
 
 | Task | How |
 |---|---|
@@ -87,9 +128,8 @@ Production runs the **same image** on the organisation's estate; TLS termination
 | Audit trail | All record changes are versioned in-app (`RecordVersion`/`AuditEvent` tables); exports, status changes, role changes and imports write audit events. The audit trail outlives the records it describes — never truncate these tables |
 | Seed / legislation updates | Ship as versioned migrations through the normal release process — never manual SQL against a live database |
 
-## 6. Known gaps (deliberate, tracked)
+## 7. Known gaps (deliberate, tracked)
 
-- **No OIDC yet** — `AUTH_MODE=dev` is the only working auth; the OIDC slice is scheduled before any staging deployment. Do not expose an instance beyond a trusted network until then.
 - **Migrations are manual** — neither the image entrypoint nor compose runs `alembic upgrade head` automatically; it is a deliberate deploy step (§3/§4).
 - **JSON structured logging** (NFRs §5) is not yet implemented — logs are uvicorn's default text format on stdout.
 - **Image registry / signed releases / estate IaC** — decided with the first real deployment (`environments-devops.md` §5).

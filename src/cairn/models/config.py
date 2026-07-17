@@ -32,6 +32,10 @@ class User(AuditedBase):
     __tablename__ = "user"
 
     display_name: Mapped[str]
+    # SSO identity: email matches the first OIDC login; the token's stable
+    # subject is then bound so later logins survive an email change at the IdP.
+    email: Mapped[str | None] = mapped_column(unique=True)
+    oidc_subject: Mapped[str | None] = mapped_column(unique=True)
     role: Mapped[Role] = mapped_column(default=Role.VIEWER)
     business_function_id: Mapped[str | None] = mapped_column(ForeignKey("business_function.id"))
     is_active: Mapped[bool] = mapped_column(default=True)

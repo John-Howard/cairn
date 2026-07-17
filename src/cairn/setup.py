@@ -101,7 +101,10 @@ async def setup_submit(request: Request, session: Session = Depends(get_session)
     seed_legal(session)
     seed_frs_pack(session)
 
-    bootstrap_user = User(display_name=display_name, role=Role.APPROVER_DPO)
+    bootstrap_email = form.get("bootstrap_email", "").strip().lower() or None
+    bootstrap_user = User(
+        display_name=display_name, email=bootstrap_email, role=Role.APPROVER_DPO
+    )
     session.add(bootstrap_user)
     session.flush()
 

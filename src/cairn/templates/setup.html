@@ -23,6 +23,7 @@
 
   <h2 class="govuk-heading-m">Bootstrap user</h2>
   {{ text_input("display_name", "Your name") }}
+  {{ text_input("bootstrap_email", "Your email", hint="Needed to sign in once single sign-on is enabled — must match your organisation account") }}
 
   <button type="submit" class="govuk-button" data-module="govuk-button">Complete setup</button>
 </form>

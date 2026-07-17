@@ -58,8 +58,22 @@ def _require_dev_mode() -> None:
         raise HTTPException(status_code=404)
 
 
+LOGIN_ERRORS = {
+    "denied": "Your account isn't set up in Cairn. Contact the IG team to be added.",
+    "exchange_failed": "Sign-in with your organisation account failed. Try again.",
+}
+
+
 @router.get("/login")
-def login_form(request: Request, session: Session = Depends(get_session)):
+def login_form(
+    request: Request, error: str | None = None, session: Session = Depends(get_session)
+):
+    if get_settings().auth_mode == "oidc":
+        return templates.TemplateResponse(
+            request,
+            "login_oidc.html",
+            {"error": LOGIN_ERRORS.get(error or "")},
+        )
     _require_dev_mode()
     users = session.scalars(
         select(User).where(User.is_active).order_by(User.display_name)

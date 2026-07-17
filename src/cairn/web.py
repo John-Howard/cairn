@@ -14,6 +14,7 @@ from cairn.complaints import router as complaints_router
 from cairn.dashboard import router as dashboard_router
 from cairn.imports import router as imports_router
 from cairn.intake import router as intake_router
+from cairn.oidc import router as oidc_router
 from cairn.regime_policy import router as regime_policy_router
 from cairn.registers import router as registers_router
 from cairn.settings import get_settings
@@ -27,8 +28,22 @@ GOVUK_ASSETS_DIR = STATIC_DIR / "govuk" / "assets"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    if settings.auth_mode not in ("dev", "oidc"):
+        raise RuntimeError(f"Unknown AUTH_MODE: {settings.auth_mode!r}")
     if settings.auth_mode != "dev" and settings.session_secret == "dev-secret-change-me":
         raise RuntimeError("SESSION_SECRET must be set when AUTH_MODE is not 'dev'")
+    if settings.auth_mode == "oidc":
+        missing = [
+            name
+            for name, value in (
+                ("OIDC_ISSUER", settings.oidc_issuer),
+                ("OIDC_CLIENT_ID", settings.oidc_client_id),
+                ("OIDC_CLIENT_SECRET", settings.oidc_client_secret),
+            )
+            if not value
+        ]
+        if missing:
+            raise RuntimeError(f"AUTH_MODE=oidc requires: {', '.join(missing)}")
     app = FastAPI()
 
     app.add_middleware(
@@ -36,7 +51,7 @@ def create_app() -> FastAPI:
         secret_key=settings.session_secret,
         session_cookie="cairn_session",
         same_site="lax",
-        https_only=False,
+        https_only=settings.auth_mode == "oidc",
     )
 
     @app.middleware("http")
@@ -62,6 +77,7 @@ def create_app() -> FastAPI:
         return {"status": "ok", "version": cairn.__version__}
 
     app.include_router(auth_router)
+    app.include_router(oidc_router)
     app.include_router(setup_router)
     app.include_router(dashboard_router)
     app.include_router(vocabularies_router)

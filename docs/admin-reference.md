@@ -6,13 +6,18 @@
 
 ## 1. Configuration
 
-All behaviour differences between environments come from three environment variables (`src/cairn/settings.py`); there are no environment-specific builds or config files.
+All behaviour differences between environments come from environment variables (`src/cairn/settings.py`); there are no environment-specific builds or config files.
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///cairn.db` | SQLAlchemy URL. Reference deployment uses `postgresql+psycopg://…` |
 | `SESSION_SECRET` | `dev-secret-change-me` | Signs the session cookie. **Must be set to a strong random value outside dev.** Rotating it invalidates all active sessions (users are logged out; no data is lost) |
-| `AUTH_MODE` | `dev` | `dev` enables the passwordless dev-login screen at `/login`. Any other value disables the login routes entirely — **OIDC SSO is not yet built** (planned before staging), so until that slice lands the application is only usable with `AUTH_MODE=dev` and must not be exposed beyond a trusted network |
+| `AUTH_MODE` | `dev` | `dev` enables the passwordless dev-login screen at `/login`; `oidc` enables SSO (below). Anything else is rejected at startup |
+| `OIDC_ISSUER` | — | Required when `AUTH_MODE=oidc`. The IdP issuer URL; for Entra ID: `https://login.microsoftonline.com/<tenant-id>/v2.0` (discovery at `<issuer>/.well-known/openid-configuration`) |
+| `OIDC_CLIENT_ID` | — | Required when `AUTH_MODE=oidc`. The Entra app registration's application (client) ID |
+| `OIDC_CLIENT_SECRET` | — | Required when `AUTH_MODE=oidc`. Client secret from the app registration — inject from the estate's secret store, never commit |
+
+**OIDC / Entra notes (staging & production):** the app registration needs a **web** redirect URI of `https://<host>/auth/oidc/callback` and ID tokens enabled; Cairn requests `openid profile email` with Authorization Code + PKCE. In `oidc` mode the session cookie is marked `Secure`, so the app must be served over HTTPS. Sign-in is **deny-by-default**: a user must already exist in Cairn (created at `/users`) with an **email matching their IdP sign-in address**; on first login the token's subject is bound to the account (audited), and later logins match by subject. Unknown or deactivated identities are redirected back to `/login` and the denial is written to the JSON log (subject only, no personal data). MFA is enforced at the IdP, not in Cairn.
 
 ## 2. Development
 

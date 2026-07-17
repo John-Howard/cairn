@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Sign in</h1>
+
+    {% if error %}
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+      <div role="alert">
+        <h2 class="govuk-error-summary__title">There is a problem</h2>
+        <div class="govuk-error-summary__body">{{ error }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <p class="govuk-body">Use your organisation account. Cairn holds no passwords — sign-in and multi-factor authentication are handled by your organisation's identity provider.</p>
+    <a href="/auth/oidc/login" role="button" draggable="false" class="govuk-button" data-module="govuk-button">Sign in with your organisation account</a>
+  </div>
+</div>
+{% endblock %}

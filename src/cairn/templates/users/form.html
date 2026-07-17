@@ -10,6 +10,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
   {{ text_input("display_name", "Display name", values.display_name, error=error_map.get("display_name")) }}
+  {{ text_input("email", "Email (for single sign-on)", values.email, hint="Must match the account they sign in with at the identity provider", error=error_map.get("email")) }}
   {{ select("role", "Role", role_options, selected=values.role) }}
   {{ select("business_function_id", "Business function", business_function_options, selected=values.business_function_id) }}
   {% if error_map.get("business_function_id") %}<p class="govuk-error-message">{{ error_map.get("business_function_id") }}</p>{% endif %}

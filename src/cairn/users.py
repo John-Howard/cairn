@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from cairn.audit import record_event
@@ -27,12 +27,18 @@ def _business_function_options(session: Session) -> list[tuple[str, str]]:
 
 
 def _new_values() -> dict:
-    return {"display_name": "", "role": Role.VIEWER.value, "business_function_id": ""}
+    return {
+        "display_name": "",
+        "email": "",
+        "role": Role.VIEWER.value,
+        "business_function_id": "",
+    }
 
 
 def _user_to_values(target: User) -> dict:
     return {
         "display_name": target.display_name,
+        "email": target.email or "",
         "role": target.role.value,
         "business_function_id": target.business_function_id or "",
     }
@@ -41,15 +47,30 @@ def _user_to_values(target: User) -> dict:
 def _parse_user_form(form) -> dict:
     return {
         "display_name": form.get("display_name", "").strip(),
+        "email": form.get("email", "").strip().lower(),
         "role": form.get("role", Role.VIEWER.value),
         "business_function_id": form.get("business_function_id", ""),
     }
 
 
-def _validate_user(session: Session, values: dict) -> list[dict]:
+def _validate_user(
+    session: Session, values: dict, *, target_id: str | None = None
+) -> list[dict]:
     errors = []
     if not values["display_name"]:
         errors.append({"field": "display_name", "message": "Enter a name"})
+    email = values["email"]
+    if email:
+        if "@" not in email:
+            errors.append({"field": "email", "message": "Enter a valid email address"})
+        else:
+            clash = session.scalar(
+                select(User).where(func.lower(User.email) == email, User.id != (target_id or ""))
+            )
+            if clash is not None:
+                errors.append(
+                    {"field": "email", "message": "Another user already has this email"}
+                )
     try:
         role = Role(values["role"])
     except ValueError:
@@ -69,6 +90,7 @@ def _validate_user(session: Session, values: dict) -> list[dict]:
 
 def _apply_user_values(target: User, values: dict) -> None:
     target.display_name = values["display_name"]
+    target.email = values["email"] or None
     target.role = Role(values["role"])
     target.business_function_id = (
         values["business_function_id"] if target.role == Role.CONTRIBUTOR else None
@@ -204,7 +226,7 @@ async def user_update(
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
     values = _parse_user_form(form)
-    errors = _validate_user(session, values)
+    errors = _validate_user(session, values, target_id=target.id)
     if errors:
         context = _form_context(
             session,

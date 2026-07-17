@@ -5,6 +5,13 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://cairn:cairn@db:5432/cairn
+      # For SSO (staging/prod): set AUTH_MODE=oidc and supply the three OIDC_*
+      # values from the estate's secret store (see docs/admin-reference.md §1).
+      AUTH_MODE: ${AUTH_MODE:-dev}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-secret-change-me}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

@@ -68,7 +68,7 @@ Intake does not require all of Phase 2. Minimum set, mapped to the Project Plan:
 
 | Stage | Activity | Output |
 |-------|----------|--------|
-| P1 | Seed vocabularies (Spec §7) + Organisation Profile; load question set as config | Intake-ready instance |
+| P1 | Seed vocabularies (Spec §7) + Organisation Profile; load question set as config — worked checklist: `Cairn-pilot-p1-seeding-checklist.md` | Intake-ready instance |
 | P2 | Walkthrough with IG team acting as respondents (dry run) | Wording/flow fixes before real users |
 | P3 | Pilot function 1 & 2 respondents complete intake; IG observes | Draft activities + usability findings |
 | P4 | Interviews + document review on the drafts; curation; first DPO sign-offs | First `active` records; curation-load measurement |

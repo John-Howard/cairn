@@ -25,7 +25,7 @@ Intake is a **guided, wizard-style front end over the draft-activity model** —
 - Answers that match controlled vocabulary values link directly; answers that don't become **proposed reference values** for curator approval (Plan §5.1 propose-and-approve).
 - "Don't know" is a first-class answer, stored as an explicit gap for IG follow-up — not an empty field.
 - The **question set is configuration, not code**: questions, help text, prompt lists and section flow are held as data (per sector pack), so wording can iterate without rebuilds — consistent with Cairn's configurable-core principle.
-- Section K (enforcement) renders **conditionally** from the respondent's business function; the trial/pilot questions map to `lifecycle_stage`.
+- Section K (enforcement) renders **conditionally** from the respondent's business function; the trial/pilot questions map to `lifecycle_stage`. **Question-level conditional logic is also configuration** (`depends_on` per question): follow-ups reveal only when their parent answer applies (GOV.UK conditional-reveal pattern), cross-section dependencies gate rendering, answers whose condition is no longer met are normalised to *not applicable* server-side, and the one true contradiction (C4/C5 — processor *and* joint) is rejected with an error rather than silently resolved.
 
 **Out of scope for intake:** lawful-basis determination, regime classification, DPIA completion, sign-off. Intake gathers facts; curation and approval turn facts into compliant records (the C→curate→approve pipeline below).
 

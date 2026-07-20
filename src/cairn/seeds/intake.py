@@ -33,10 +33,10 @@ QUESTIONS: list[tuple] = [
      "If it is business as usual, answer No.",
      IntakeAnswerKind.YES_NO, None, "lifecycle_trial", False),
     ("B3_START", "B", "About this activity",
-     "If it is a trial or pilot — when did it start?",
+     "When did it start?",
      None, IntakeAnswerKind.DATE, None, "trial_start", False),
     ("B3_END", "B", "About this activity",
-     "If it is a trial or pilot — when is it due to end?",
+     "When is it due to end?",
      None, IntakeAnswerKind.DATE, None, "trial_end", False),
     ("B4", "B", "About this activity",
      "Is your team doing anything with people's information that you think isn't "
@@ -53,13 +53,13 @@ QUESTIONS: list[tuple] = [
      "Is there a law, statutory duty or policy that requires or allows you to do this?",
      None, IntakeAnswerKind.YES_NO, None, "statutory_task", False),
     ("C3_DETAIL", "C", "What the activity is for",
-     "If yes — which one, if you know?",
+     "Which one, if you know?",
      None, IntakeAnswerKind.TEXT, None, None, False),
     ("C4", "C", "What the activity is for",
      "Are you doing this work for another organisation, under their instructions?",
      None, IntakeAnswerKind.YES_NO, None, "processor", False),
     ("C4_ORG", "C", "What the activity is for",
-     "If yes — which organisation?",
+     "Which organisation?",
      None, IntakeAnswerKind.TEXT, None, None, False),
     ("C5", "C", "What the activity is for",
      "Are you doing this jointly with another organisation, where you both decide how it works?",
@@ -119,13 +119,12 @@ QUESTIONS: list[tuple] = [
      "to score, rank or prioritise them?",
      None, IntakeAnswerKind.YES_NO, None, "external_data_use", False),
     ("F4", "F", "Where does the information come from?",
-     "If so — is that done by a person reviewing it, or automatically by a system or model?",
+     "Is that done by a person reviewing it, or automatically by a system or model?",
      None, IntakeAnswerKind.SINGLE_CHOICE,
      {"choices": [["person", "By a person"], ["system", "Automatically by a system or model"]]},
      "external_data_use", False),
     ("F5", "F", "Where does the information come from?",
-     "If automatic — does the system make the decision, or does it only suggest and "
-     "a person decides?",
+     "Does the system make the decision, or does it only suggest and a person decides?",
      None, IntakeAnswerKind.SINGLE_CHOICE,
      {"choices": [["decides", "The system decides"],
                   ["suggests", "It suggests — a person decides"]]},
@@ -191,11 +190,10 @@ QUESTIONS: list[tuple] = [
      "Do you ask people for their consent for this activity?",
      None, IntakeAnswerKind.YES_NO, None, None, False),
     ("J1_DETAIL", "J", "Rights, consent and risk",
-     "If yes — how is consent recorded, and how can someone withdraw it?",
+     "How is consent recorded, and how can someone withdraw it?",
      None, IntakeAnswerKind.TEXTAREA, None, None, False),
     ("J2", "J", "Rights, consent and risk",
-     "If children are involved and you rely on consent — how do you check age, and do you "
-     "get parental consent?",
+     "How do you check age, and do you get parental consent?",
      None, IntakeAnswerKind.TEXTAREA, None, None, False),
     ("J3", "J", "Rights, consent and risk",
      "Are people told what you do with their information (e.g. a privacy notice, a leaflet, "
@@ -238,6 +236,28 @@ QUESTIONS: list[tuple] = [
 ]
 
 
+# Conditional logic (Question Set structure, held as configuration).
+# {"question": code, "in": [values]}: asked only when that answer matches;
+# {"all": [...]} requires every condition. Parents in the same section render
+# as GOV.UK conditional reveals; parents in earlier sections gate rendering.
+DEPENDS_ON: dict[str, dict] = {
+    "B3_START": {"question": "B3", "in": ["yes"]},
+    "B3_END": {"question": "B3", "in": ["yes"]},
+    "C3_DETAIL": {"question": "C3", "in": ["yes"]},
+    "C4_ORG": {"question": "C4", "in": ["yes"]},
+    "F4": {"question": "F3", "in": ["yes"]},
+    "F5": {"question": "F4", "in": ["system"]},
+    "J1_DETAIL": {"question": "J1", "in": ["yes"]},
+    "J2": {"all": [
+        {"question": "D2", "in": ["yes"]},
+        {"question": "J1", "in": ["yes"]},
+    ]},
+    "K2": {"question": "K1", "in": ["yes"]},
+    "K3": {"question": "K1", "in": ["yes"]},
+    "K4": {"question": "K1", "in": ["yes"]},
+}
+
+
 def seed_intake_questions(session: Session) -> None:
     existing = session.scalars(select(IntakeQuestion.code)).all()
     if existing:
@@ -254,6 +274,7 @@ def seed_intake_questions(session: Session) -> None:
                 hint=hint,
                 answer_kind=kind,
                 options=options,
+                depends_on=DEPENDS_ON.get(code),
                 populates=populates,
                 enforcement_only=enforcement,
             )

@@ -25,6 +25,10 @@ class IntakeQuestion(AuditedBase):
     hint: Mapped[str | None] = mapped_column(Text)
     answer_kind: Mapped[IntakeAnswerKind]
     options: Mapped[dict | None] = mapped_column(JSON)
+    # Conditional logic (configuration, like wording): {"question": code,
+    # "in": [values]} or {"all": [conditions...]}. Unmet → the question is
+    # not asked and any answer is normalised to not-applicable on save.
+    depends_on: Mapped[dict | None] = mapped_column(JSON)
     populates: Mapped[str | None]
     enforcement_only: Mapped[bool] = mapped_column(default=False)
     is_active: Mapped[bool] = mapped_column(default=True)

@@ -453,3 +453,136 @@ def test_existing_label_in_new_box_links_instead_of_proposing(
         assert proposed.entry_status == EntryStatus.PROPOSED
         existing = db.scalars(select(Recipient).where(Recipient.label == "police")).all()
         assert len(existing) == 1
+
+
+def test_depends_on_seeded(session):
+    q = session.scalars(
+        select(IntakeQuestion).where(IntakeQuestion.code == "B3_START")
+    ).one()
+    assert q.depends_on == {"question": "B3", "in": ["yes"]}
+    j2 = session.scalars(select(IntakeQuestion).where(IntakeQuestion.code == "J2")).one()
+    assert {"question": "D2", "in": ["yes"]} in j2.depends_on["all"]
+
+
+def test_dependent_question_rendered_as_conditional_reveal(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="Reveal check")
+    page = client.get(f"/intake/{submission_id}/section/B").text
+    assert 'data-aria-controls="conditional-B3-yes"' in page
+    assert 'id="conditional-B3-yes"' in page
+    # the dates live inside the reveal, hidden until B3=yes is chosen
+    reveal = page.split('id="conditional-B3-yes"')[1]
+    assert 'name="B3_START"' in reveal
+    assert "govuk-radios__conditional--hidden" in page
+
+
+def test_unmet_dependency_normalised_to_not_applicable(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="Trial dates ignored")
+    # Browser submits hidden revealed fields — B3=no must void the dates
+    _save_section(
+        client, submission_id, "B",
+        {"B3": "no", "B3_START": "2026-01-01", "B3_END": "2026-06-30"},
+    )
+    activity_id = _submit(client, submission_id)
+    with Session(engine) as db:
+        submission = db.get(IntakeSubmission, submission_id)
+        assert submission.answers["B3_START"] == {"na": True}
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.lifecycle_stage == LifecycleStage.LIVE
+        assert activity.trial_start is None and activity.trial_end is None
+
+
+def test_changing_parent_voids_stale_child_answers(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="Stale child")
+    _save_section(client, submission_id, "F", {"F3": "yes", "F4": "system", "F5": "decides"})
+    # Respondent goes back and changes their mind: F3 no
+    _save_section(client, submission_id, "F", {"F3": "no", "F4": "system", "F5": "decides"})
+    activity_id = _submit(client, submission_id)
+    with Session(engine) as db:
+        submission = db.get(IntakeSubmission, submission_id)
+        assert submission.answers["F4"] == {"na": True}
+        assert submission.answers["F5"] == {"na": True}
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.external_data_use_mode == ExternalDataUseMode.NONE
+
+
+def test_cross_section_dependency_gates_rendering(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="No children no J2")
+    _save_section(client, submission_id, "D", {"D2": "no"})
+    page = client.get(f"/intake/{submission_id}/section/J").text
+    assert 'name="J2"' not in page
+
+    _save_section(client, submission_id, "D", {"D2": "yes"})
+    page = client.get(f"/intake/{submission_id}/section/J").text
+    assert 'name="J2"' in page
+
+
+def test_contradictory_c4_c5_rejected_with_error_summary(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="Contradiction")
+    token = _page_csrf(client, f"/intake/{submission_id}/section/C")
+    response = client.post(
+        f"/intake/{submission_id}/section/C",
+        data={"csrf_token": token, "nav": "next", "C4": "yes", "C5": "yes"},
+    )
+    assert response.status_code == 422
+    assert "There is a problem" in response.text
+    assert "it can&#39;t be both" in response.text or "can't be both" in response.text
+    with Session(engine) as db:
+        submission = db.get(IntakeSubmission, submission_id)
+        assert submission.answers.get("C4") is None  # nothing saved
+
+    # Resolving the contradiction saves normally
+    response = client.post(
+        f"/intake/{submission_id}/section/C",
+        data={"csrf_token": token, "nav": "next", "C4": "yes", "C5": "no"},
+    )
+    assert response.status_code == 302
+
+
+def test_dont_know_on_unasked_question_creates_no_gap(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="No phantom gaps")
+    # C3 answered No; C3_DETAIL dk ticked (hidden field submitted anyway)
+    _save_section(client, submission_id, "C", {"C3": "no", "C3_DETAIL__dk": "1"})
+    _submit(client, submission_id)
+    with Session(engine) as db:
+        gap_codes = {
+            g.question_code
+            for g in db.scalars(
+                select(IntakeGap).where(IntakeGap.submission_id == submission_id)
+            )
+        }
+        assert "C3_DETAIL" not in gap_codes
+
+
+def test_review_shows_not_applicable_for_unasked_questions(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start(client, engine, name="NA on review")
+    _save_section(client, submission_id, "B", {"B3": "no"})
+    page = client.get(f"/intake/{submission_id}/review").text
+    assert "Not applicable" in page

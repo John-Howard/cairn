@@ -1,8 +1,8 @@
 # Cairn — Overall Project Plan
 
-**Status:** Project Plan v0.2 — high-level roadmap for iteration. Detailed planning (resourcing, durations, costs) is deferred to future engagements.
+**Status:** Project Plan v0.3 — roadmap updated to record build progress (2026-07): **Phases 1 and 2 are delivered on `main`**, including the pulled-forward intake slice and post-build security hardening; Phase 0 is complete bar sign-off and naming; Phase 3 is partially evidenced (automated testing) with formal assurance outstanding. Detailed planning (resourcing, durations, costs) remains deferred.
 **System:** *Cairn* — a single-tenant, configurable Record of Processing Activities (ROPA) and accountability tool; the Fire and Rescue Service (FRS) is the first sector profile.
-**Derives from:** *ROPA Tool — High-Level Plan & Data Architecture* (**Plan v0.12**, `ROPA-tool-plan.md`) and *ROPA Tool — Field-Level Build Specification* (**Spec v0.3**, `ROPA-tool-field-spec.md`).
+**Derives from:** *ROPA Tool — High-Level Plan & Data Architecture* (**Plan v0.12**, `ROPA-tool-plan.md`) and *ROPA Tool — Field-Level Build Specification* (**Spec v0.4**, `ROPA-tool-field-spec.md`; the build followed v0.4's spike-validated clarifications).
 
 ---
 
@@ -11,7 +11,7 @@
 - **Outcome-based phases.** Each phase produces something usable or decision-ready; phases overlap where sensible. Durations and resourcing are intentionally out of scope here (§11).
 - **Build the configurable core, ship the FRS first.** Per Plan, Cairn is one configurable codebase; v1 populates a single sector pack (FRS) so a working register ships without waiting for an abstract platform.
 - **Single-tenant.** Each organisation runs its own instance — no multi-tenant isolation problem to engineer (Plan, *Configuration & deployment model*).
-- **Design is largely done.** Phases 0–2 build directly on the completed architecture (Plan v0.12) and field spec (Spec v0.3), so the project starts from a strong, low-ambiguity base.
+- **Design and build are done.** The architecture (Plan v0.12) and field spec (Spec v0.4) were completed first, and Phases 1–2 have been delivered against them — the remaining phases are assurance, pilot, and operations, not engineering from scratch.
 
 ---
 
@@ -19,10 +19,10 @@
 
 ```mermaid
 flowchart LR
-    P0["<b>Phase 0</b><br/>Design &<br/>Documentation<br/><i>(nearly complete)</i>"]
-    P1["<b>Phase 1</b><br/>Technical Architecture<br/>& Foundations"]
-    P2["<b>Phase 2</b><br/>Application<br/>Development (2a–2f)"]
-    P3["<b>Phase 3</b><br/>Testing &<br/>Assurance"]
+    P0["<b>Phase 0</b><br/>Design &<br/>Documentation<br/><i>(done bar sign-off/naming)</i>"]
+    P1["<b>Phase 1</b><br/>Technical Architecture<br/>& Foundations<br/><i>(complete)</i>"]
+    P2["<b>Phase 2</b><br/>Application<br/>Development (2a–2f)<br/><i>(complete)</i>"]
+    P3["<b>Phase 3</b><br/>Testing &<br/>Assurance<br/><i>(in progress)</i>"]
     P4["<b>Phase 4</b><br/>Information Audit<br/>Pilot & Data Load"]
     P5["<b>Phase 5</b><br/>Deployment<br/>& Go-Live"]
     P6["<b>Phase 6</b><br/>Operate, Maintain<br/>& Iterate"]
@@ -34,36 +34,36 @@ flowchart LR
     CC -.-> P5
 ```
 
-| Phase | Focus | Key output |
-|-------|-------|-----------|
-| 0 | Design & documentation | Signed-off design baseline |
-| 1 | Technical architecture & foundations | Architecture, stack, environments, physical schema |
-| 2 | Application development | Working Cairn (FRS pack), built 2a→2f |
-| 3 | Testing & assurance | Tested, secure, accessible, DPIA'd system |
-| 4 | Information audit pilot & data load | Audit run through Cairn; populated ROPA |
-| 5 | Deployment & go-live | Cairn live across the service |
-| 6 | Operate, maintain & iterate | BAU + legislation watch + future sector packs |
+| Phase | Focus | Key output | Status (2026-07) |
+|-------|-------|-----------|------------------|
+| 0 | Design & documentation | Signed-off design baseline | Complete bar sign-off & Cairn naming in plan/spec |
+| 1 | Technical architecture & foundations | Architecture, stack, environments, physical schema | **Complete** — all seven stages delivered (§4) |
+| 2 | Application development | Working Cairn (FRS pack), built 2a→2f | **Complete** on `main`, incl. intake + security hardening (§5) |
+| 3 | Testing & assurance | Tested, secure, accessible, DPIA'd system | In progress — automated evidence done; formal assurance outstanding (§6) |
+| 4 | Information audit pilot & data load | Audit run through Cairn; populated ROPA | Ready — build dependency met, worked artefacts prepared (§7) |
+| 5 | Deployment & go-live | Cairn live across the service | Not started |
+| 6 | Operate, maintain & iterate | BAU + legislation watch + future sector packs | Not started |
 
 ---
 
-## 3. Phase 0 — Design & Documentation *(nearly complete)*
+## 3. Phase 0 — Design & Documentation *(complete bar sign-off and naming)*
 
 **Objective:** a stable, signed-off design baseline to build against.
 
-**Remaining steps (carried from Plan/Spec):**
-- Seed the controlled vocabularies as data — the full Schedule 1/8 sets and FRS pack seeds are drafted (Spec §7); load and confirm FRS-priority defaults.
-- Verify the Schedule 1/8 vocabularies and DUAA provisions against the latest *revised* legislation before they are fixed as data (Spec §11).
-- Confirm the remaining FRS pack content (business functions, data-subject/data categories, module defaults).
-- Stakeholder sign-off of the design baseline — DPO, SIRO, IG lead.
-- Apply the *Cairn* naming across the plan and spec when ready (currently deferred).
+**Remaining steps (carried from Plan/Spec), with status:**
+- ~~Seed the controlled vocabularies as data~~ — **done**: the full legal sets and FRS pack (including the intake question set) live in `src/cairn/seeds/` and load at `/setup`.
+- Verify the Schedule 1/8 vocabularies and DUAA provisions against the latest *revised* legislation (Spec §11) — **open**; now a gated step in the pilot P1 seeding checklist (item A1).
+- Confirm the remaining FRS pack content — **open**; pilot P1 checklist item A2.
+- Stakeholder sign-off of the design baseline — DPO, SIRO, IG lead — **open**.
+- Apply the *Cairn* naming across the plan and spec — **still deferred** (both docs carry the working "ROPA Tool" branding).
 
 **Deliverables:** design baseline (Plan + Spec at agreed versions), seeded-vocabulary source, sign-off record.
 
 ---
 
-## 4. Phase 1 — Technical Architecture & Foundations *(summary stages)*
+## 4. Phase 1 — Technical Architecture & Foundations *(complete)*
 
-**Objective:** turn the logical design into a build-ready technical architecture and working delivery environment. *Summary level only — each stage becomes its own detailed engagement.*
+**Objective:** turn the logical design into a build-ready technical architecture and working delivery environment. **All seven stages are delivered**: 1.1 `solution-architecture.md` · 1.2 the physical schema (`src/cairn/models/`, Alembic migrations) · 1.3 `security-architecture.md` · 1.4 `integration-architecture.md` · 1.5 `non-functional-requirements.md` · 1.6 `environments-devops.md` + CI + the compose reference deployment · 1.7 `spike-findings.md` (validated the dual-mapping and profile-conditioned rule engine, feeding Spec v0.4).
 
 | Stage | Focus |
 |-------|-------|
@@ -81,9 +81,9 @@ flowchart LR
 
 ---
 
-## 5. Phase 2 — Application Development
+## 5. Phase 2 — Application Development *(complete)*
 
-**Objective:** build Cairn to the field spec, in the sequence already agreed (Plan §6). Each sub-phase is releasable.
+**Objective:** build Cairn to the field spec, in the sequence already agreed (Plan §6). Each sub-phase is releasable. **Delivered on `main` (2026-07)**: all of 2a–2f including the pulled-forward intake wizard and gaps curation (2d), plus post-build security hardening beyond the original scope — OIDC SSO against Entra ID with enforced session lifetimes and RP-initiated logout, JSON structured logging with audited authorisation denials, and a DB-checking `/healthz` (see `Cairn-backlog.md` §1).
 
 | Sub-phase | Scope (Plan §6 / Spec) |
 |-----------|------------------------|
@@ -100,9 +100,11 @@ flowchart LR
 
 ---
 
-## 6. Phase 3 — Testing & Assurance
+## 6. Phase 3 — Testing & Assurance *(in progress)*
 
 **Objective:** prove Cairn is correct, secure, accessible and compliant before it holds real records.
+
+**Status (2026-07):** the automated evidence exists — 294 functional/integration tests in CI including a dedicated rules-engine suite and mocked-IdP auth coverage. **Outstanding, and larger than originally scoped** because the surface grew (OIDC endpoints; intake is now the highest-traffic screen): penetration test, WCAG 2.2 AA testing, UAT, and the DPIA delta for the personal data Cairn itself now holds (see `Cairn-backlog.md` §2/§5).
 
 **Key activities:** functional & integration testing; dedicated **rules-engine testing** of the 17 validation rules (incl. the configurable-boundary and profile-conditioned behaviours); user acceptance testing with the IG team and departmental contributors; **security testing / penetration test**; **accessibility testing (WCAG 2.2 AA — public-sector requirement)**; performance & resilience testing; completion of **Cairn's own DPIA** (the tool itself processes personal data — record owners, complainants, etc.).
 
@@ -122,7 +124,7 @@ flowchart LR
 
 **Worked artefacts** (per Intake & Pilot Plan §5): P1 seeding checklist (`Cairn-pilot-p1-seeding-checklist.md`), P2 dry-run script (`Cairn-pilot-p2-dryrun-script.md`), pilot communications pack (`Cairn-pilot-comms-pack.md`).
 
-**Dependency:** the pilot-enabling build milestone (2a + intake slice of 2d) plus sufficient Phase 3 assurance to hold real data.
+**Dependency:** the pilot-enabling build milestone (2a + intake slice of 2d) — **met (2026-07)** — plus sufficient Phase 3 assurance to hold real data (outstanding, §6).
 
 ---
 
@@ -162,15 +164,15 @@ Run across multiple phases rather than sitting in one:
 
 ## 11. Key assumptions & decisions for the next engagement
 
-Flagged now, to resolve when we go into detail:
+Flagged at v0.1; status as of v0.3:
 
-1. **Build model** — in-house development, low-code/configurable platform, or supplier-delivered? This most shapes Phases 1–2 planning.
-2. **Hosting** — on-premise, UK public-sector cloud, or other? Drives the security and NFR work in Phase 1.
-3. **Resourcing & timeline** — team shape, and any fixed deadlines (e.g. aligning go-live to a DUAA milestone). Durations deliberately omitted here.
-4. **Migration source** — confirm the current ROPA's format and quality (existing spreadsheets/templates); migration is now a *reconciliation* against audit-derived records (Phase 4).
-5. **Pilot scope** — *proposed and recorded*: Prevention & Community Safety + HR first, then department-by-department (see Intake & Pilot Plan §5); confirm.
-6. **Reuse ambition** — whether further sector packs (Phase 6) are a near-term goal or a later option, which affects how hard the configuration seams are pushed in Phase 2a.
+1. **Build model** — **resolved**: in-house/bespoke build on the Solution Architecture stack (FastAPI + Jinja2/htmx + GOV.UK Design System over SQLAlchemy; PostgreSQL in prod), delivered in Phase 2.
+2. **Hosting** — **resolved at the architecture level**: cloud-agnostic containers with a UK-cloud reference deployment (Solution Architecture §hosting); the specific estate is chosen at first deployment.
+3. **Resourcing & timeline** — open. Durations deliberately omitted here.
+4. **Migration source** — open: confirm the current ROPA's format and quality (existing spreadsheets/templates); migration is a *reconciliation* against audit-derived records (Phase 4).
+5. **Pilot scope** — *proposed and recorded*: Prevention & Community Safety + HR first, then department-by-department (see Intake & Pilot Plan §5); confirm at pilot kick-off.
+6. **Reuse ambition** — open for Phase 6 planning; the configuration seams (Organisation Profile, sector packs, per-pack question sets, profile-conditioned rules) were built and proven in Phase 2, so this is now purely a roadmap question.
 
 ---
 
-*Project Plan v0.2. Derives from Plan v0.12 and Spec v0.3; will iterate as detailed planning proceeds.*
+*Project Plan v0.3. Derives from Plan v0.12 and Spec v0.4; v0.3 records delivery status (Phases 1–2 complete, 2026-07). Will iterate as assurance and pilot planning proceed.*

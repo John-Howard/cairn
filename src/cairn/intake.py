@@ -133,11 +133,43 @@ def _dont_know(submission: IntakeSubmission, code: str) -> bool:
     return bool(_answer(submission, code).get("dk"))
 
 
-def _value(submission: IntakeSubmission, code: str, default=None):
-    answer = _answer(submission, code)
-    if answer.get("dk"):
+def _effective_value(answers: dict, code: str, default=None):
+    answer = answers.get(code) or {}
+    if answer.get("dk") or answer.get("na"):
         return default
     return answer.get("v", default)
+
+
+def _value(submission: IntakeSubmission, code: str, default=None):
+    return _effective_value(submission.answers, code, default)
+
+
+def condition_met(answers: dict, condition: dict | None) -> bool:
+    """Evaluate a depends_on condition against an answers dict. A don't-know or
+    not-applicable parent answer never satisfies a condition."""
+    if not condition:
+        return True
+    if "all" in condition:
+        return all(condition_met(answers, part) for part in condition["all"])
+    return _effective_value(answers, condition["question"]) in condition["in"]
+
+
+def _split_conditions(
+    question: IntakeQuestion, section_codes: set[str]
+) -> tuple[dict | None, list[dict]]:
+    """Split depends_on into (same-section condition, cross-section conditions).
+
+    Same-section parents become GOV.UK conditional reveals; cross-section
+    parents were answered in earlier sections and gate rendering outright.
+    Every seeded case has at most one same-section parent.
+    """
+    condition = question.depends_on
+    if not condition:
+        return None, []
+    parts = condition["all"] if "all" in condition else [condition]
+    same = [p for p in parts if p["question"] in section_codes]
+    cross = [p for p in parts if p["question"] not in section_codes]
+    return (same[0] if same else None), cross
 
 
 def parse_section_form(
@@ -204,6 +236,10 @@ def answer_display(
     session: Session, submission: IntakeSubmission, question: IntakeQuestion
 ) -> str:
     """Human-readable form of a stored answer, for the review and read-only views."""
+    if _answer(submission, question.code).get("na") or not condition_met(
+        submission.answers, question.depends_on
+    ):
+        return "Not applicable"
     if _dont_know(submission, question.code):
         return "Don't know"
     value = _value(submission, question.code)
@@ -336,7 +372,9 @@ def apply_submission(
     if not is_enforcement_function(submission.business_function):
         asked = {c: q for c, q in asked.items() if not q.enforcement_only}
     for code, question in asked.items():
-        if _dont_know(submission, code):
+        if _dont_know(submission, code) and condition_met(
+            submission.answers, question.depends_on
+        ):
             session.add(
                 IntakeGap(
                     submission_id=submission.id,
@@ -579,6 +617,65 @@ def _section_or_404(submission: IntakeSubmission, section: str) -> list[str]:
     return sections
 
 
+def _render_tree(submission_answers: dict, questions: list[IntakeQuestion]) -> list[dict]:
+    """Nest same-section dependents under their parent (for conditional
+    reveals) and drop questions whose cross-section conditions are unmet."""
+    section_codes = {q.code for q in questions}
+    nodes: dict[str, dict] = {}
+    items: list[dict] = []
+    for question in questions:
+        same, cross = _split_conditions(question, section_codes)
+        if not all(condition_met(submission_answers, c) for c in cross):
+            continue
+        node = {"question": question, "children": [], "reveal_values": None}
+        if same is not None:
+            parent = nodes.get(same["question"])
+            if parent is None:
+                continue  # parent itself not asked → neither is the child
+            node["reveal_values"] = same["in"]
+            nodes[question.code] = node
+            parent["children"].append(node)
+        else:
+            nodes[question.code] = node
+            items.append(node)
+    return items
+
+
+def normalise_answers(session: Session, answers: dict) -> dict:
+    """Reset any lingering answer whose depends_on is no longer met — e.g. the
+    respondent went back and changed the parent. Server-side authority; the
+    conditional reveals are only a courtesy."""
+    for question in _questions(session):
+        if question.depends_on is None:
+            continue
+        entry = answers.get(question.code)
+        if entry and not entry.get("na") and not condition_met(answers, question.depends_on):
+            answers[question.code] = {"na": True}
+    return answers
+
+
+def validate_section(section: str, answers: dict) -> list[dict]:
+    """True contradictions only — intake stays tolerant of everything else."""
+    errors: list[dict] = []
+    if section == "C":
+        if (
+            _effective_value(answers, "C4") == "yes"
+            and _effective_value(answers, "C5") == "yes"
+        ):
+            errors.append(
+                {
+                    "code": "C5",
+                    "message": (
+                        "An activity is recorded as either done for another "
+                        "organisation (the previous question) or done jointly — "
+                        "it can't be both. Answer Yes to whichever is the closer "
+                        "fit, or ask the IG team."
+                    ),
+                }
+            )
+    return errors
+
+
 def _section_context(
     request: Request,
     user: User,
@@ -586,6 +683,9 @@ def _section_context(
     submission: IntakeSubmission,
     section: str,
     sections: list[str],
+    *,
+    answers: dict | None = None,
+    errors: list[dict] | None = None,
 ) -> dict:
     questions = _questions(session, section)
     vocab_options = {}
@@ -600,17 +700,21 @@ def _section_context(
                 ],
                 "proposable": config.proposable,
             }
+    answers = submission.answers if answers is None else answers
     index = sections.index(section)
     return {
         **_base_context(request, user),
         "submission": submission,
+        "answers": answers,
         "section": section,
         "section_title": questions[0].section_title if questions else section,
-        "questions": questions,
+        "items": _render_tree(answers, questions),
         "vocab_options": vocab_options,
         "sections": sections,
         "prev_section": sections[index - 1] if index > 0 else None,
         "is_last": index == len(sections) - 1,
+        "errors": errors or [],
+        "error_map": {e["code"]: e["message"] for e in (errors or [])},
     }
 
 
@@ -643,10 +747,20 @@ async def intake_section_save(
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
     questions = _questions(session, section)
-    submission.answers = {
-        **submission.answers,
-        **parse_section_form(session, questions, form),
-    }
+    merged = normalise_answers(
+        session,
+        {**submission.answers, **parse_section_form(session, questions, form)},
+    )
+    errors = validate_section(section, merged)
+    if errors:
+        context = _section_context(
+            request, user, session, submission, section, sections,
+            answers=merged, errors=errors,
+        )
+        return templates.TemplateResponse(
+            request, "intake/section.html", context, status_code=422
+        )
+    submission.answers = merged
     session.flush()
     index = sections.index(section)
     if form.get("nav") == "back" and index > 0:
@@ -684,7 +798,12 @@ def intake_review(
         _entries, new_names = _vocab_selection(session, submission, code, vocab_key)
         if new_names:
             proposals[vocab_key] = new_names
-    dont_know_codes = [q.code for q in questions if _dont_know(submission, q.code)]
+    dont_know_codes = [
+        q.code
+        for q in questions
+        if _dont_know(submission, q.code)
+        and condition_met(submission.answers, q.depends_on)
+    ]
     return templates.TemplateResponse(
         request,
         "intake/review.html",

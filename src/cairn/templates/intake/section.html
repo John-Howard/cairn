@@ -1,5 +1,96 @@
 {% extends "base.html" %}
 {% block title %}Intake — {{ section_title }}{% endblock %}
+
+{% macro question_input(q, v) %}
+  {% if q.answer_kind.value == "text" %}
+  <input class="govuk-input" id="{{ q.code }}" name="{{ q.code }}" type="text" value="{{ v or '' }}">
+
+  {% elif q.answer_kind.value == "textarea" %}
+  <textarea class="govuk-textarea" id="{{ q.code }}" name="{{ q.code }}" rows="3">{{ v or '' }}</textarea>
+
+  {% elif q.answer_kind.value == "date" %}
+  <input class="govuk-input govuk-input--width-10" id="{{ q.code }}" name="{{ q.code }}" type="date" value="{{ v or '' }}">
+
+  {% elif q.answer_kind.value == "multi_choice" %}
+  <div class="govuk-checkboxes" data-module="govuk-checkboxes">
+    {% for value, label in q.options["choices"] %}
+    <div class="govuk-checkboxes__item">
+      <input class="govuk-checkboxes__input" id="{{ q.code }}-{{ value }}" name="{{ q.code }}" type="checkbox" value="{{ value }}" {% if v and value in v %}checked{% endif %}>
+      <label class="govuk-label govuk-checkboxes__label" for="{{ q.code }}-{{ value }}">{{ label }}</label>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% elif q.answer_kind.value == "vocab_multi" %}
+  {% set opts = vocab_options[q.code] %}
+  {% set selected_ids = (v or {}).get("ids") or [] %}
+  <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+    {% for entry_id, entry_label in opts.entries %}
+    <div class="govuk-checkboxes__item">
+      <input class="govuk-checkboxes__input" id="{{ q.code }}-{{ entry_id }}" name="{{ q.code }}" type="checkbox" value="{{ entry_id }}" {% if entry_id in selected_ids %}checked{% endif %}>
+      <label class="govuk-label govuk-checkboxes__label" for="{{ q.code }}-{{ entry_id }}">{{ entry_label }}</label>
+    </div>
+    {% endfor %}
+  </div>
+  {% if opts.proposable %}
+  <div class="govuk-form-group govuk-!-margin-top-2">
+    <label class="govuk-label" for="{{ q.code }}__new">Anything not in the list? Add it here (separate with semicolons)</label>
+    <input class="govuk-input" id="{{ q.code }}__new" name="{{ q.code }}__new" type="text" value="{{ ((v or {}).get("new") or []) | join("; ") }}">
+  </div>
+  {% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% macro question_block(node) %}
+  {% set q = node.question %}
+  {% set stored = answers.get(q.code) or {} %}
+  {% set v = stored.get("v") if not stored.get("na") else None %}
+  <div class="govuk-form-group {% if error_map.get(q.code) %}govuk-form-group--error{% endif %}" id="{{ q.code }}-group">
+    {% if q.answer_kind.value in ("yes_no", "single_choice") %}
+    <fieldset class="govuk-fieldset">
+    <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">{{ q.text }}</legend>
+    {% else %}
+    <label class="govuk-label govuk-label--s" for="{{ q.code }}">{{ q.text }}</label>
+    {% endif %}
+    {% if q.hint %}<div class="govuk-hint">{{ q.hint }}</div>{% endif %}
+    {% if error_map.get(q.code) %}
+    <p class="govuk-error-message" id="{{ q.code }}-error"><span class="govuk-visually-hidden">Error:</span> {{ error_map.get(q.code) }}</p>
+    {% endif %}
+
+    {% if q.answer_kind.value in ("yes_no", "single_choice") %}
+    {# Radios — with GOV.UK conditional reveals for dependent questions #}
+    {% set choices = [["yes", "Yes"], ["no", "No"]] if q.answer_kind.value == "yes_no" else q.options["choices"] %}
+    <div class="govuk-radios {% if q.answer_kind.value == "yes_no" and not node.children %}govuk-radios--inline{% endif %}" data-module="govuk-radios">
+      {% for value, label in choices %}
+      {% set revealed = [] %}
+      {% for child in node.children %}{% if value in child.reveal_values %}{% set _ = revealed.append(child) %}{% endif %}{% endfor %}
+      <div class="govuk-radios__item">
+        <input class="govuk-radios__input" id="{{ q.code }}-{{ value }}" name="{{ q.code }}" type="radio" value="{{ value }}"
+               {% if v == value %}checked{% endif %}
+               {% if revealed %}data-aria-controls="conditional-{{ q.code }}-{{ value }}"{% endif %}>
+        <label class="govuk-label govuk-radios__label" for="{{ q.code }}-{{ value }}">{{ label }}</label>
+      </div>
+      {% if revealed %}
+      <div class="govuk-radios__conditional {% if v != value %}govuk-radios__conditional--hidden{% endif %}" id="conditional-{{ q.code }}-{{ value }}">
+        {% for child in revealed %}{{ question_block(child) }}{% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    </fieldset>
+    {% else %}
+    {{ question_input(q, v) }}
+    {% endif %}
+
+    <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1" data-module="govuk-checkboxes">
+      <div class="govuk-checkboxes__item">
+        <input class="govuk-checkboxes__input" id="{{ q.code }}__dk" name="{{ q.code }}__dk" type="checkbox" value="1" {% if stored.get("dk") %}checked{% endif %}>
+        <label class="govuk-label govuk-checkboxes__label" for="{{ q.code }}__dk">Don't know — ask the IG team to follow up</label>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
 {% block content %}
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-two-thirds">
@@ -7,84 +98,23 @@
     <span class="govuk-caption-l">{{ submission.activity_name }} — section {{ sections.index(section) + 1 }} of {{ sections|length }}</span>
     <h1 class="govuk-heading-l">{{ section_title }}</h1>
 
+    {% if errors %}
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+      <div role="alert">
+        <h2 class="govuk-error-summary__title">There is a problem</h2>
+        <div class="govuk-error-summary__body">
+          <ul class="govuk-list govuk-error-summary__list">
+            {% for e in errors %}<li><a href="#{{ e.code }}-group">{{ e.message }}</a></li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <form method="post" action="/intake/{{ submission.id }}/section/{{ section }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-      {% for q in questions %}
-      {% set stored = submission.answers.get(q.code) or {} %}
-      {% set v = stored.get("v") %}
-      <div class="govuk-form-group">
-        <label class="govuk-label govuk-label--s" for="{{ q.code }}">{{ q.text }}</label>
-        {% if q.hint %}<div class="govuk-hint">{{ q.hint }}</div>{% endif %}
-
-        {% if q.answer_kind.value == "text" %}
-        <input class="govuk-input" id="{{ q.code }}" name="{{ q.code }}" type="text" value="{{ v or '' }}">
-
-        {% elif q.answer_kind.value == "textarea" %}
-        <textarea class="govuk-textarea" id="{{ q.code }}" name="{{ q.code }}" rows="3">{{ v or '' }}</textarea>
-
-        {% elif q.answer_kind.value == "date" %}
-        <input class="govuk-input govuk-input--width-10" id="{{ q.code }}" name="{{ q.code }}" type="date" value="{{ v or '' }}">
-
-        {% elif q.answer_kind.value == "yes_no" %}
-        <div class="govuk-radios govuk-radios--inline" data-module="govuk-radios">
-          <div class="govuk-radios__item">
-            <input class="govuk-radios__input" id="{{ q.code }}" name="{{ q.code }}" type="radio" value="yes" {% if v == "yes" %}checked{% endif %}>
-            <label class="govuk-label govuk-radios__label" for="{{ q.code }}">Yes</label>
-          </div>
-          <div class="govuk-radios__item">
-            <input class="govuk-radios__input" id="{{ q.code }}-no" name="{{ q.code }}" type="radio" value="no" {% if v == "no" %}checked{% endif %}>
-            <label class="govuk-label govuk-radios__label" for="{{ q.code }}-no">No</label>
-          </div>
-        </div>
-
-        {% elif q.answer_kind.value == "single_choice" %}
-        <div class="govuk-radios" data-module="govuk-radios">
-          {% for value, label in q.options["choices"] %}
-          <div class="govuk-radios__item">
-            <input class="govuk-radios__input" id="{{ q.code }}-{{ value }}" name="{{ q.code }}" type="radio" value="{{ value }}" {% if v == value %}checked{% endif %}>
-            <label class="govuk-label govuk-radios__label" for="{{ q.code }}-{{ value }}">{{ label }}</label>
-          </div>
-          {% endfor %}
-        </div>
-
-        {% elif q.answer_kind.value == "multi_choice" %}
-        <div class="govuk-checkboxes" data-module="govuk-checkboxes">
-          {% for value, label in q.options["choices"] %}
-          <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" id="{{ q.code }}-{{ value }}" name="{{ q.code }}" type="checkbox" value="{{ value }}" {% if v and value in v %}checked{% endif %}>
-            <label class="govuk-label govuk-checkboxes__label" for="{{ q.code }}-{{ value }}">{{ label }}</label>
-          </div>
-          {% endfor %}
-        </div>
-
-        {% elif q.answer_kind.value == "vocab_multi" %}
-        {% set opts = vocab_options[q.code] %}
-        {% set selected_ids = (v or {}).get("ids") or [] %}
-        <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
-          {% for entry_id, entry_label in opts.entries %}
-          <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" id="{{ q.code }}-{{ entry_id }}" name="{{ q.code }}" type="checkbox" value="{{ entry_id }}" {% if entry_id in selected_ids %}checked{% endif %}>
-            <label class="govuk-label govuk-checkboxes__label" for="{{ q.code }}-{{ entry_id }}">{{ entry_label }}</label>
-          </div>
-          {% endfor %}
-        </div>
-        {% if opts.proposable %}
-        <div class="govuk-form-group govuk-!-margin-top-2">
-          <label class="govuk-label" for="{{ q.code }}__new">Anything not in the list? Add it here (separate with semicolons)</label>
-          <input class="govuk-input" id="{{ q.code }}__new" name="{{ q.code }}__new" type="text" value="{{ ((v or {}).get("new") or []) | join("; ") }}">
-        </div>
-        {% endif %}
-        {% endif %}
-
-        <div class="govuk-checkboxes govuk-checkboxes--small govuk-!-margin-top-1" data-module="govuk-checkboxes">
-          <div class="govuk-checkboxes__item">
-            <input class="govuk-checkboxes__input" id="{{ q.code }}__dk" name="{{ q.code }}__dk" type="checkbox" value="1" {% if stored.get("dk") %}checked{% endif %}>
-            <label class="govuk-label govuk-checkboxes__label" for="{{ q.code }}__dk">Don't know — ask the IG team to follow up</label>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
+      {% for node in items %}{{ question_block(node) }}{% endfor %}
 
       <div class="govuk-button-group">
         {% if prev_section %}

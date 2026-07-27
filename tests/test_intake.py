@@ -2,11 +2,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cairn.models import (
+    AssetType,
     AuditEvent,
     ControllerOrProcessor,
     DataSubjectCategory,
     EntryStatus,
     ExternalDataUseMode,
+    InformationAsset,
     IntakeGap,
     IntakeQuestion,
     IntakeStatus,
@@ -17,7 +19,6 @@ from cairn.models import (
     Recipient,
     RecordStatus,
     Regime,
-    SystemAsset,
 )
 from test_activities import _extract_csrf, _login
 
@@ -170,12 +171,14 @@ def test_full_intake_creates_draft_activity(activities_client, activities_web_en
         assert not activity.criminal_offence_flag
         assert {r.label for r in activity.recipients} == {"police"}
         assert {s.name for s in activity.data_sources} == {"CACI Acorn"}
-        assert {s.label for s in activity.systems} == {"HFSV mobile app"}
+        assert {s.label for s in activity.assets} == {"HFSV mobile app"}
 
         proposed_system = db.scalars(
-            select(SystemAsset).where(SystemAsset.label == "HFSV mobile app")
+            select(InformationAsset).where(InformationAsset.label == "HFSV mobile app")
         ).one()
         assert proposed_system.entry_status == EntryStatus.PROPOSED
+        assert proposed_system.asset_type == AssetType.SYSTEM
+        assert proposed_system.contains_personal_data is True
 
         submission = db.get(IntakeSubmission, submission_id)
         assert submission.status == IntakeStatus.SUBMITTED

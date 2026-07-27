@@ -12,6 +12,7 @@ from cairn.models import (
     AdequacyStatus,
     APDScope,
     DataSubjectCategory,
+    InformationAsset,
     LawfulBasisRecord,
     LEClassification,
     LegalEntity,
@@ -24,7 +25,6 @@ from cairn.models import (
     RegimeScope,
     RetentionRule,
     SecurityMeasure,
-    SystemAsset,
     ThirdCountry,
     Transfer,
 )
@@ -329,11 +329,11 @@ def test_s61_le_classification_legal_basis_and_s62_systems(session, actor, frs_p
     session.flush()
     activity.data_subjects.append(suspect)
 
-    in_scope = SystemAsset(label="Case Management System", s62_logging_in_scope=True)
-    out_scope = SystemAsset(label="Rostering System", s62_logging_in_scope=False)
+    in_scope = InformationAsset(label="Case Management System", s62_logging_in_scope=True)
+    out_scope = InformationAsset(label="Rostering System", s62_logging_in_scope=False)
     session.add_all([in_scope, out_scope])
     session.flush()
-    activity.systems.extend([in_scope, out_scope])
+    activity.assets.extend([in_scope, out_scope])
     session.flush()
     session.expire_all()
 

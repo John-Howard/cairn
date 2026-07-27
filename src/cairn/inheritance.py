@@ -5,7 +5,7 @@ from cairn.models import ActivitySecurity, ProcessingActivity
 
 def sync_inherited_security(session: Session, activity: ProcessingActivity) -> None:
     target_ids = {
-        measure.id for system in activity.systems for measure in system.security_measures
+        measure.id for asset in activity.assets for measure in asset.security_measures
     }
     existing = {link.security_measure_id: link for link in activity.security_links}
 

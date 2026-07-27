@@ -22,12 +22,14 @@ from cairn.auth import get_csrf_token, require_role, verify_csrf
 from cairn.db import get_session
 from cairn.inheritance import sync_inherited_security
 from cairn.models import (
+    AssetType,
     BusinessFunction,
     ControllerOrProcessor,
     DataSubjectCategory,
     EntryStatus,
     ExternalDataSource,
     ExternalDataUseMode,
+    InformationAsset,
     IntakeGap,
     IntakeQuestion,
     IntakeStatus,
@@ -40,7 +42,6 @@ from cairn.models import (
     RecordStatus,
     RegimeSource,
     Role,
-    SystemAsset,
     User,
 )
 from cairn.regime import resolve_regime
@@ -71,7 +72,7 @@ VOCABS: dict[str, VocabConfig] = {
         PersonalDataCategory, proposable=False, activity_attr="data_categories"
     ),
     "recipients": VocabConfig(Recipient, activity_attr="recipients"),
-    "systems": VocabConfig(SystemAsset, activity_attr="systems"),
+    "systems": VocabConfig(InformationAsset, activity_attr="assets"),
     "external_sources": VocabConfig(
         ExternalDataSource, label_attr="name", activity_attr="data_sources"
     ),
@@ -350,6 +351,9 @@ def apply_submission(
             kwargs = {config.label_attr: name, "entry_status": EntryStatus.PROPOSED}
             if config.model is Recipient:
                 kwargs["type"] = RecipientType.OTHER
+            if config.model is InformationAsset:
+                kwargs["asset_type"] = AssetType.SYSTEM
+                kwargs["contains_personal_data"] = True
             entry = config.model(**kwargs)
             session.add(entry)
             session.flush()
@@ -365,7 +369,7 @@ def apply_submission(
                 activity.data_categories.append(category)
 
     session.flush()
-    if activity.systems:
+    if activity.assets:
         sync_inherited_security(session, activity)
 
     asked = {q.code: q for q in _questions(session)}

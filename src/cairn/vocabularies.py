@@ -35,7 +35,6 @@ from cairn.models import (
     SourceSpecialCategory,
     SpecialCategoryCondition,
     SupplierRole,
-    SystemAsset,
     ThirdCountry,
     TransferMechanism,
     User,
@@ -133,26 +132,6 @@ VOCABULARIES: dict[str, VocabSpec] = {
                 VocabField(
                     "category", "Category", "enum", required=True, enum_cls=SecurityMeasureCategory
                 ),
-            ],
-        ),
-        VocabSpec(
-            key="systems",
-            model=SystemAsset,
-            display_name="System / Asset",
-            label_attr="label",
-            accepts_proposals=True,
-            fields=[
-                VocabField("label", "Label", "text", required=True),
-                VocabField("owner", "Owner", "text"),
-                VocabField("location", "Location", "text"),
-                VocabField("hosting_country", "Hosting country", "text"),
-                VocabField(
-                    "default_retention_id",
-                    "Default retention rule",
-                    "fk",
-                    fk_model=RetentionRule,
-                ),
-                VocabField("s62_logging_in_scope", "s62 logging in scope", "bool"),
             ],
         ),
         VocabSpec(

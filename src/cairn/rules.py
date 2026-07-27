@@ -282,7 +282,7 @@ def _no_unapproved_references(activity: ProcessingActivity) -> str | None:
     entries = [
         *activity.data_subjects,
         *activity.recipients,
-        *activity.systems,
+        *activity.assets,
         *activity.data_sources,
         *(link.category for link in activity.data_category_links),
         *(link.rule for link in activity.retention_links),

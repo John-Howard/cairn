@@ -23,6 +23,7 @@ from cairn.models import (
     DataSubjectCategory,
     DecisionSupportADM,
     ExternalDataSource,
+    InformationAsset,
     LawfulBasisRecord,
     LegalEntity,
     LegalEntityRoleType,
@@ -38,7 +39,6 @@ from cairn.models import (
     ScreeningOutcome,
     SecurityMeasure,
     SupplierRole,
-    SystemAsset,
     ThirdCountry,
     Transfer,
     TransferMechanism,
@@ -65,7 +65,7 @@ def test_every_entity_instantiates_and_flushes(session, actor, frs_profile):
         label="Incident records", period="7 years", trigger="incident closure"
     )
     security = session.scalars(select(SecurityMeasure)).first()
-    system = SystemAsset(
+    system = InformationAsset(
         label="Incident Recording System",
         security_measures=[security],
         s62_logging_in_scope=True,
@@ -89,7 +89,7 @@ def test_every_entity_instantiates_and_flushes(session, actor, frs_profile):
 
     activity.data_subjects.append(session.scalars(select(DataSubjectCategory)).first())
     activity.recipients.append(session.scalars(select(Recipient)).first())
-    activity.systems.append(system)
+    activity.assets.append(system)
     activity.data_sources.append(source)
 
     contract = ContractDSA(

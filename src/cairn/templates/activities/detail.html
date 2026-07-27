@@ -115,7 +115,7 @@
 {{ simple_junction_section("data-subjects", "Data subjects", data_subjects, data_subject_options, activity.id, csrf_token) }}
 {{ data_categories_section(data_category_rows, data_category_options, data_subject_scope_options, activity.id, csrf_token) }}
 {{ simple_junction_section("recipients", "Recipients", recipients, recipient_options, activity.id, csrf_token) }}
-{{ simple_junction_section("systems", "Systems", systems, system_options, activity.id, csrf_token) }}
+{{ simple_junction_section("assets", "Assets", assets, asset_options, activity.id, csrf_token) }}
 {{ simple_junction_section("data-sources", "External data sources", data_sources, data_source_options, activity.id, csrf_token) }}
 {% if activity.controller_or_processor.value in ("processor", "joint") %}
 {{ simple_junction_section("controllers", "Controllers", controllers, controller_options, activity.id, csrf_token) }}

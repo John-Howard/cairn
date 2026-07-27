@@ -11,6 +11,7 @@ from cairn.models import (
     ContractDSA,
     DecisionSupportADM,
     ExternalDataSource,
+    InformationAsset,
     LegalEntity,
     LegalEntityRoleType,
     LifecycleStage,
@@ -21,7 +22,6 @@ from cairn.models import (
     RetentionRule,
     SecurityMeasure,
     SecurityMeasureCategory,
-    SystemAsset,
     ThirdCountry,
     Transfer,
     User,
@@ -77,7 +77,7 @@ def _add_retention_rule(engine, *, label="Standard retention"):
 
 def _add_system(engine, *, label="Case Management System", default_retention_id=None):
     with Session(engine) as db:
-        system = SystemAsset(label=label, default_retention_id=default_retention_id)
+        system = InformationAsset(label=label, default_retention_id=default_retention_id)
         db.add(system)
         db.commit()
         return system.id
@@ -560,7 +560,7 @@ def test_retention_suggestion_prefill_and_add_remove(activities_client, activiti
     )
     token = _token(activities_client)
     activities_client.post(
-        f"/activities/{activity_id}/systems",
+        f"/activities/{activity_id}/assets",
         data={"csrf_token": token, "item_id": system_id},
     )
 
@@ -618,7 +618,7 @@ def test_security_inheritance_on_system_link_unlink(activities_client, activitie
     )
     system_id = _add_system(activities_web_engine, label="Mobile Data Terminal")
     with Session(activities_web_engine) as db:
-        system = db.get(SystemAsset, system_id)
+        system = db.get(InformationAsset, system_id)
         measure = SecurityMeasure(
             label="disk encryption", category=SecurityMeasureCategory.TECHNICAL
         )
@@ -630,13 +630,13 @@ def test_security_inheritance_on_system_link_unlink(activities_client, activitie
 
     token = _token(activities_client)
     activities_client.post(
-        f"/activities/{activity_id}/systems",
+        f"/activities/{activity_id}/assets",
         data={"csrf_token": token, "item_id": system_id},
     )
 
     detail = activities_client.get(f"/activities/{activity_id}")
     assert "disk encryption" in detail.text
-    assert "Inherited from systems" in detail.text
+    assert "Inherited from assets" in detail.text
 
     manual_measure_id = _add_security_measure(activities_web_engine, label="clean desk policy")
     add_token = _token(activities_client)
@@ -666,12 +666,12 @@ def test_security_inheritance_on_system_link_unlink(activities_client, activitie
 
     unlink_token = _token(activities_client)
     activities_client.post(
-        f"/activities/{activity_id}/systems/{system_id}/remove",
+        f"/activities/{activity_id}/assets/{system_id}/remove",
         data={"csrf_token": unlink_token},
     )
 
     after_unlink = activities_client.get(f"/activities/{activity_id}")
-    assert "Inherited from systems" not in after_unlink.text
+    assert "Inherited from assets" not in after_unlink.text
     assert "clean desk policy" in after_unlink.text
 
 

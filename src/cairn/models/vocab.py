@@ -1,13 +1,18 @@
+from datetime import date
+
 from sqlalchemy import Column, ForeignKey, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from cairn.models.base import AuditedBase, Base
 from cairn.models.enums import (
     AdequacyStatus,
+    AssetStatus,
+    AssetType,
     EntryStatus,
     LEClassification,
     LegalEntityRoleType,
     RecipientType,
+    SecurityClassification,
     SecurityMeasureCategory,
     SourceSpecialCategory,
     SupplierRole,
@@ -114,26 +119,39 @@ class RetentionRule(ProposableMixin, AuditedBase):
     disposal_method: Mapped[str | None]
 
 
-system_securitymeasure = Table(
-    "system_securitymeasure",
+asset_securitymeasure = Table(
+    "asset_securitymeasure",
     Base.metadata,
-    Column("system_id", ForeignKey("system_asset.id"), primary_key=True),
+    Column("asset_id", ForeignKey("information_asset.id"), primary_key=True),
     Column("security_measure_id", ForeignKey("security_measure.id"), primary_key=True),
 )
 
 
-class SystemAsset(ProposableMixin, AuditedBase):
-    __tablename__ = "system_asset"
+class InformationAsset(ProposableMixin, AuditedBase):
+    __tablename__ = "information_asset"
 
     label: Mapped[str]
+    asset_type: Mapped[AssetType] = mapped_column(default=AssetType.SYSTEM)
+    description: Mapped[str | None] = mapped_column(Text)
+    iao_user_id: Mapped[str | None] = mapped_column(ForeignKey("user.id"))
+    custodian: Mapped[str | None]
+    business_function_id: Mapped[str | None] = mapped_column(ForeignKey("business_function.id"))
+    classification: Mapped[SecurityClassification] = mapped_column(
+        default=SecurityClassification.NOT_CLASSIFIED
+    )
+    contains_personal_data: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[AssetStatus] = mapped_column(default=AssetStatus.IN_USE)
+    next_review_date: Mapped[date | None]
+    supplier_entity_id: Mapped[str | None] = mapped_column(ForeignKey("legal_entity.id"))
     owner: Mapped[str | None]
     location: Mapped[str | None]
     hosting_country: Mapped[str | None]
     default_retention_id: Mapped[str | None] = mapped_column(ForeignKey("retention_rule.id"))
     s62_logging_in_scope: Mapped[bool] = mapped_column(default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
 
     security_measures: Mapped[list[SecurityMeasure]] = relationship(
-        secondary=system_securitymeasure
+        secondary=asset_securitymeasure
     )
 
 

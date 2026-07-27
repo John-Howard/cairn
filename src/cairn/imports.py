@@ -14,11 +14,13 @@ from cairn.db import get_session
 from cairn.inheritance import sync_inherited_security
 from cairn.models import (
     ActivityDomain,
+    AssetType,
     BusinessFunction,
     DataSubjectCategory,
     EntryStatus,
     ImportBatch,
     ImportBatchStatus,
+    InformationAsset,
     PersonalDataCategory,
     PersonalDataSource,
     ProcessingActivity,
@@ -27,7 +29,6 @@ from cairn.models import (
     RecordStatus,
     RegimeSource,
     Role,
-    SystemAsset,
     User,
 )
 from cairn.regime import resolve_regime
@@ -52,7 +53,7 @@ VOCAB_COLUMNS: list[VocabColumn] = [
     VocabColumn("data_subjects", DataSubjectCategory, "data_subjects"),
     VocabColumn("data_categories", PersonalDataCategory, "data_categories"),
     VocabColumn("recipients", Recipient, "recipients"),
-    VocabColumn("systems", SystemAsset, "systems"),
+    VocabColumn("systems", InformationAsset, "assets"),
 ]
 
 COLUMN_LABELS = {
@@ -207,6 +208,9 @@ def apply_batch(
             kwargs = {col.label_attr: name, "entry_status": EntryStatus.PROPOSED}
             if col.model is Recipient:
                 kwargs["type"] = RecipientType.OTHER
+            if col.model is InformationAsset:
+                kwargs["asset_type"] = AssetType.SYSTEM
+                kwargs["contains_personal_data"] = True
             entry = col.model(**kwargs)
             session.add(entry)
             proposal_entities[col.column][key] = entry
@@ -234,7 +238,7 @@ def apply_batch(
         session.add(activity)
         session.flush()
 
-        linked_system = False
+        linked_asset = False
         for col in VOCAB_COLUMNS:
             collection = getattr(activity, col.attr)
             for entry_id, _label in report.matches.get(col.column, []):
@@ -246,9 +250,9 @@ def apply_batch(
             if col.column == "systems" and (
                 report.matches.get("systems") or report.proposals.get("systems")
             ):
-                linked_system = True
+                linked_asset = True
         session.flush()
-        if linked_system:
+        if linked_asset:
             sync_inherited_security(session, activity)
         activities.append(activity)
     return activities, proposal_ids

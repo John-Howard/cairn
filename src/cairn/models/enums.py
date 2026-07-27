@@ -227,3 +227,23 @@ class IntakeStatus(StrEnum):
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
     CANCELLED = "cancelled"
+
+
+class AssetType(StrEnum):
+    SYSTEM = "system"
+    DATABASE = "database"
+    SOFTWARE = "software"
+    PAPER = "paper"
+    PHYSICAL = "physical"
+
+
+class AssetStatus(StrEnum):
+    IN_USE = "in_use"
+    RETIRING = "retiring"
+    DISPOSED = "disposed"
+
+
+class SecurityClassification(StrEnum):
+    NOT_CLASSIFIED = "not_classified"
+    OFFICIAL = "official"
+    OFFICIAL_SENSITIVE = "official_sensitive"

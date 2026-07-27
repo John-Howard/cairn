@@ -1,8 +1,11 @@
+import csv
+import io
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,13 +20,18 @@ from cairn.models import (
     EntryStatus,
     InformationAsset,
     LegalEntity,
+    OrganisationProfile,
     ProcessingActivity,
+    RecordStatus,
+    RegimeSource,
     RetentionRule,
     Role,
     SecurityClassification,
     SecurityMeasure,
     User,
 )
+from cairn.regime import resolve_regime
+from cairn.rules import evaluate_asset
 from cairn.templating import templates
 
 router = APIRouter()
@@ -98,6 +106,11 @@ def _require_can_add(user: User) -> None:
     if user.role in (Role.CURATOR, Role.APPROVER_DPO, Role.CONTRIBUTOR):
         return
     raise HTTPException(status_code=403, detail="Not permitted to add information assets")
+
+
+def _require_can_create_activity(user: User) -> None:
+    if user.role not in (Role.CONTRIBUTOR, Role.CURATOR, Role.APPROVER_DPO):
+        raise HTTPException(status_code=403, detail="Not permitted to create activities")
 
 
 def _valid_date(value: str) -> bool:
@@ -274,11 +287,9 @@ def _gap_flags(asset: InformationAsset, linked_activity_count: int, today: date)
     gaps = []
     if asset.iao_user_id is None:
         gaps.append("No Information Asset Owner is set for this asset.")
-    if asset.contains_personal_data and linked_activity_count == 0:
-        gaps.append(
-            "This asset holds personal data but is not linked to any processing activity — "
-            "possible undocumented processing."
-        )
+    finding = evaluate_asset(asset, linked_activity_count)
+    if finding is not None:
+        gaps.append(finding.message)
     if asset.next_review_date is not None and asset.next_review_date < today:
         gaps.append(f"Review was due on {asset.next_review_date} and is now overdue.")
     return gaps
@@ -292,21 +303,19 @@ def _linked_activities(session: Session, asset: InformationAsset) -> list[Proces
     ).all()
 
 
-@router.get("/assets")
-def list_assets(
-    request: Request,
-    asset_type: str | None = None,
-    business_function_id: str | None = None,
-    iao_user_id: str | None = None,
-    classification: str | None = None,
-    contains_personal_data: str | None = None,
-    status: str | None = None,
-    review_overdue: str | None = None,
-    mine: str | None = None,
-    user: User = Depends(current_user),
-    session: Session = Depends(get_session),
+def _filtered_assets_query(
+    *,
+    asset_type: str | None,
+    business_function_id: str | None,
+    iao_user_id: str | None,
+    classification: str | None,
+    contains_personal_data: str | None,
+    status: str | None,
+    review_overdue: str | None,
+    mine: str | None,
+    user: User,
+    today: date,
 ):
-    today = date.today()
     query = select(InformationAsset).order_by(InformationAsset.label)
     if asset_type:
         try:
@@ -340,7 +349,61 @@ def list_assets(
         )
     if mine == "true":
         query = query.where(InformationAsset.iao_user_id == user.id)
+    return query
 
+
+def _export_href(
+    *,
+    asset_type: str | None,
+    business_function_id: str | None,
+    iao_user_id: str | None,
+    classification: str | None,
+    contains_personal_data: str | None,
+    status: str | None,
+    review_overdue: str | None,
+    mine: str | None,
+) -> str:
+    params = {
+        "asset_type": asset_type or "",
+        "business_function_id": business_function_id or "",
+        "iao_user_id": iao_user_id or "",
+        "classification": classification or "",
+        "contains_personal_data": contains_personal_data or "",
+        "status": status or "",
+        "review_overdue": review_overdue or "",
+        "mine": mine or "",
+    }
+    qs = urlencode({k: v for k, v in params.items() if v})
+    return f"/assets/export.csv?{qs}" if qs else "/assets/export.csv"
+
+
+@router.get("/assets")
+def list_assets(
+    request: Request,
+    asset_type: str | None = None,
+    business_function_id: str | None = None,
+    iao_user_id: str | None = None,
+    classification: str | None = None,
+    contains_personal_data: str | None = None,
+    status: str | None = None,
+    review_overdue: str | None = None,
+    mine: str | None = None,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    today = date.today()
+    query = _filtered_assets_query(
+        asset_type=asset_type,
+        business_function_id=business_function_id,
+        iao_user_id=iao_user_id,
+        classification=classification,
+        contains_personal_data=contains_personal_data,
+        status=status,
+        review_overdue=review_overdue,
+        mine=mine,
+        user=user,
+        today=today,
+    )
     assets = session.scalars(query).all()
     function_labels = dict(_business_function_options(session))
     user_labels = dict(_user_options(session))
@@ -358,6 +421,16 @@ def list_assets(
     ]
     can_add = user.role in (Role.CURATOR, Role.APPROVER_DPO, Role.CONTRIBUTOR)
     can_moderate = user.role in (Role.CURATOR, Role.APPROVER_DPO)
+    export_href = _export_href(
+        asset_type=asset_type,
+        business_function_id=business_function_id,
+        iao_user_id=iao_user_id,
+        classification=classification,
+        contains_personal_data=contains_personal_data,
+        status=status,
+        review_overdue=review_overdue,
+        mine=mine,
+    )
     return templates.TemplateResponse(
         request,
         "assets/list.html",
@@ -366,6 +439,7 @@ def list_assets(
             "rows": rows,
             "can_add": can_add,
             "can_moderate": can_moderate,
+            "export_href": export_href,
             "asset_type_options": [(m.value, _enum_option_label(m)) for m in AssetType],
             "classification_options": [
                 (m.value, _enum_option_label(m)) for m in SecurityClassification
@@ -385,6 +459,73 @@ def list_assets(
             },
             "csrf_token": get_csrf_token(request),
         },
+    )
+
+
+@router.get("/assets/export.csv")
+def export_assets_csv(
+    asset_type: str | None = None,
+    business_function_id: str | None = None,
+    iao_user_id: str | None = None,
+    classification: str | None = None,
+    contains_personal_data: str | None = None,
+    status: str | None = None,
+    review_overdue: str | None = None,
+    mine: str | None = None,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    query = _filtered_assets_query(
+        asset_type=asset_type,
+        business_function_id=business_function_id,
+        iao_user_id=iao_user_id,
+        classification=classification,
+        contains_personal_data=contains_personal_data,
+        status=status,
+        review_overdue=review_overdue,
+        mine=mine,
+        user=user,
+        today=date.today(),
+    )
+    assets = session.scalars(query).all()
+    fk_maps = _fk_maps(session)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([f.label for f in ASSET_FIELDS] + ["Entry status", "Security measures"])
+    for asset in assets:
+        writer.writerow(
+            [_format_value(asset, f, fk_maps) for f in ASSET_FIELDS]
+            + [
+                _enum_option_label(asset.entry_status),
+                "; ".join(sorted(m.label for m in asset.security_measures)),
+            ]
+        )
+    profile = session.scalars(select(OrganisationProfile)).first()
+    if profile is not None:
+        record_event(
+            session,
+            entity=profile,
+            event="iar_exported",
+            actor=user,
+            new_value={
+                "filters": {
+                    "asset_type": asset_type or "",
+                    "business_function_id": business_function_id or "",
+                    "iao_user_id": iao_user_id or "",
+                    "classification": classification or "",
+                    "contains_personal_data": contains_personal_data or "",
+                    "status": status or "",
+                    "review_overdue": review_overdue or "",
+                    "mine": mine or "",
+                },
+                "rows": len(assets),
+            },
+        )
+    filename = f"information-asset-register-{date.today().isoformat()}.csv"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -453,6 +594,7 @@ def asset_detail(
         "asset": asset,
         "can_edit": user.role in (Role.CURATOR, Role.APPROVER_DPO),
         "can_moderate": user.role in (Role.CURATOR, Role.APPROVER_DPO),
+        "can_create_activity": user.role in (Role.CONTRIBUTOR, Role.CURATOR, Role.APPROVER_DPO),
         "detail_rows": _detail_rows(session, asset),
         "linked_activities": linked_activities,
         "security_measures": [(m.id, _display_label(m)) for m in asset.security_measures],
@@ -604,3 +746,58 @@ async def remove_security_measure(
         for activity in _linked_activities(session, asset):
             sync_inherited_security(session, activity)
     return RedirectResponse(f"/assets/{asset.id}", status_code=302)
+
+
+@router.post("/assets/{asset_id}/document-processing")
+async def document_processing(
+    asset_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    asset = _get_asset(session, asset_id)
+    _require_can_create_activity(user)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if asset.entry_status != EntryStatus.APPROVED:
+        raise HTTPException(
+            status_code=422, detail="Only approved assets can start a processing activity"
+        )
+    business_function_id = asset.business_function_id or user.business_function_id
+    if business_function_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Set a business function on the asset or your account "
+                "before starting an activity"
+            ),
+        )
+    if user.role == Role.CONTRIBUTOR and business_function_id != user.business_function_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Contributors may only create activities in their own business function",
+        )
+    activity = ProcessingActivity(
+        name=f"Processing on {asset.label}",
+        business_function_id=business_function_id,
+        purpose="(not yet stated — describe the processing carried out using this asset)",
+        personal_data_source=[],
+        owner_id=user.id,
+        next_review_at=date.today() + timedelta(days=365),
+        record_status=RecordStatus.DRAFT,
+    )
+    activity.regime = resolve_regime(session, activity)
+    activity.regime_source = RegimeSource.POLICY
+    session.add(activity)
+    session.flush()
+    activity.assets.append(asset)
+    session.flush()
+    sync_inherited_security(session, activity)
+    record_event(
+        session,
+        entity=activity,
+        event="activity_created_from_asset",
+        actor=user,
+        new_value={"asset_id": asset.id},
+    )
+    return RedirectResponse(f"/activities/{activity.id}", status_code=302)

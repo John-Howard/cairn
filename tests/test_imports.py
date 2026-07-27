@@ -15,6 +15,8 @@ from cairn.models import (
     Recipient,
     RecipientType,
     RecordStatus,
+    SecurityMeasure,
+    SecurityMeasureCategory,
 )
 from test_activities import _extract_csrf, _login, _user_id
 
@@ -508,3 +510,265 @@ def test_bom_handling(activities_client, activities_web_engine):
     preview = activities_client.get(f"/imports/{batch_id}")
     assert "BOM Activity" in preview.text
     assert "Unknown business function" not in preview.text
+
+
+ASSET_CSV_HEADERS = [
+    "label",
+    "asset_type",
+    "description",
+    "iao_email",
+    "custodian",
+    "business_function",
+    "classification",
+    "contains_personal_data",
+    "status",
+    "next_review_date",
+    "supplier",
+    "location",
+    "hosting_country",
+    "retention_rule",
+    "security_measures",
+]
+
+
+def _asset_upload(client, csrf_token: str, rows: list[dict], filename="assets.csv"):
+    return client.post(
+        "/imports/assets",
+        files={"file": (filename, _csv_bytes(rows, ASSET_CSV_HEADERS), "text/csv")},
+        data={"csrf_token": csrf_token},
+    )
+
+
+def _asset_confirm(client, batch_id: str, csrf_token: str):
+    return client.post(f"/imports/assets/{batch_id}/confirm", data={"csrf_token": csrf_token})
+
+
+def _asset_cancel(client, batch_id: str, csrf_token: str):
+    return client.post(f"/imports/assets/{batch_id}/cancel", data={"csrf_token": csrf_token})
+
+
+def test_asset_happy_path_confirm_creates_assets(activities_client, activities_web_engine):
+    with Session(activities_web_engine) as db:
+        db.add(
+            SecurityMeasure(label="encryption at rest", category=SecurityMeasureCategory.TECHNICAL)
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Case Management System",
+                "asset_type": "system",
+                "description": "Holds incident and casualty records",
+                "business_function": PREVENTION,
+                "classification": "official",
+                "contains_personal_data": "yes",
+                "status": "in_use",
+                "security_measures": "encryption at rest",
+            },
+        ],
+    )
+    assert upload.status_code == 302
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert preview.status_code == 200
+    assert "Case Management System" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+    assert confirm.headers["location"] == "/assets"
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Case Management System")
+        ).one()
+        assert asset.entry_status == EntryStatus.APPROVED
+        assert asset.asset_type.value == "system"
+        assert asset.classification.value == "official"
+        assert asset.contains_personal_data is True
+        assert {m.label for m in asset.security_measures} == {"encryption at rest"}
+
+        batch = db.get(ImportBatch, batch_id)
+        assert batch.status == ImportBatchStatus.CONFIRMED
+
+        events = db.scalars(
+            select(AuditEvent).where(AuditEvent.event == "asset_import_confirmed")
+        ).all()
+        assert len(events) == 1
+        assert events[0].new_value["assets"] == [asset.id]
+
+
+def test_asset_unmatched_iao_function_supplier_retention_warnings(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Unmatched Refs Asset",
+                "asset_type": "system",
+                "iao_email": "unknown@example.test",
+                "business_function": "Not A Real Function",
+                "supplier": "Not A Real Supplier",
+                "retention_rule": "Not A Real Rule",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "Unknown IAO email" in preview.text
+    assert "Unknown business function" in preview.text
+    assert "Unknown supplier" in preview.text
+    assert "Unknown retention rule" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Unmatched Refs Asset")
+        ).one()
+        assert asset.iao_user_id is None
+        assert asset.business_function_id is None
+        assert asset.supplier_entity_id is None
+        assert asset.default_retention_id is None
+
+
+def test_asset_duplicate_label_skipped(activities_client, activities_web_engine):
+    with Session(activities_web_engine) as db:
+        db.add(InformationAsset(label="Existing System"))
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {"label": "existing system", "asset_type": "system"},
+            {"label": "Brand New System", "asset_type": "system"},
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "already exists" in preview.text
+    assert "Duplicate" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        matches = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Existing System")
+        ).all()
+        assert len(matches) == 1
+        new_asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Brand New System")
+        ).one()
+        assert new_asset.entry_status.value == "approved"
+
+
+def test_asset_invalid_asset_type_error_row(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [{"label": "Bad Type Asset", "asset_type": "spaceship"}],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "Unknown asset type" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 422
+
+    with Session(activities_web_engine) as db:
+        matches = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Bad Type Asset")
+        ).all()
+        assert matches == []
+
+
+def test_asset_security_measures_unmatched_become_proposals(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Proposal Source Asset",
+                "asset_type": "system",
+                "security_measures": "brand new control",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "brand new control" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        measure = db.scalars(
+            select(SecurityMeasure).where(SecurityMeasure.label == "brand new control")
+        ).one()
+        assert measure.entry_status == EntryStatus.PROPOSED
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Proposal Source Asset")
+        ).one()
+        assert measure in asset.security_measures
+
+
+def test_asset_import_permissions(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    assert activities_client.get("/imports/assets/new").status_code == 403
+    assert activities_client.post("/imports/assets").status_code == 403
+
+
+def test_asset_import_cancel(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+    upload = _asset_upload(
+        activities_client, token, [{"label": "Cancel Me Asset", "asset_type": "system"}]
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    cancel_token = _extract_csrf(preview.text)
+    cancel = _asset_cancel(activities_client, batch_id, cancel_token)
+    assert cancel.status_code == 302
+    assert cancel.headers["location"] == "/imports/assets/new"
+
+    with Session(activities_web_engine) as db:
+        batch = db.get(ImportBatch, batch_id)
+        assert batch.status == ImportBatchStatus.CANCELLED
+        events = db.scalars(
+            select(AuditEvent).where(AuditEvent.event == "asset_import_cancelled")
+        ).all()
+        assert len(events) == 1
+        matches = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Cancel Me Asset")
+        ).all()
+        assert matches == []

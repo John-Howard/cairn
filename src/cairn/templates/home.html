@@ -121,8 +121,49 @@
       <td class="govuk-table__cell"><a class="govuk-link" href="/register/export/{{ key }}">Download CSV</a></td>
     </tr>
     {% endfor %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Information Asset Register</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ total_assets }}</td>
+      <td class="govuk-table__cell"><a class="govuk-link" href="/assets/export.csv">Download CSV</a></td>
+    </tr>
   </tbody>
 </table>
+
+<h2 class="govuk-heading-m">Information assets</h2>
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-one-half">
+    <h3 class="govuk-heading-s">By type</h3>
+    <table class="govuk-table">
+      <tbody class="govuk-table__body">
+        {% for label, count in asset_type_counts %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ label }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="govuk-grid-column-one-half">
+    <h3 class="govuk-heading-s">Attention needed</h3>
+    <table class="govuk-table">
+      <tbody class="govuk-table__body">
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">Personal-data assets with no linked activity</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/assets?contains_personal_data=true">{{ assets_undocumented_count }}</a></td>
+        </tr>
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">Assets without an Information Asset Owner</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ assets_without_iao_count }}</td>
+        </tr>
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">Reviews overdue</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/assets?review_overdue=true">{{ assets_review_overdue_count }}</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <h2 class="govuk-heading-m">Complaints</h2>
 <p class="govuk-body">{{ open_complaints_count }} open complaint{{ "" if open_complaints_count == 1 else "s" }}.{% if user.role.value in ("curator", "approver_dpo") %} <a class="govuk-link" href="/complaints">View all</a>{% endif %}</p>

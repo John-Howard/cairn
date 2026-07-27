@@ -5,10 +5,12 @@ from enum import StrEnum
 from cairn.models import (
     ActivityType,
     AgeCheckOutcome,
+    AssetStatus,
     ContractType,
     ControllerOrProcessor,
     EntryStatus,
     ExternalDataUseMode,
+    InformationAsset,
     LifecycleStage,
     LineageGranularity,
     OrganisationProfile,
@@ -125,6 +127,7 @@ TRIGGERS: dict[str, Callable[[ProcessingActivity], bool]] = {
     "adm_solely_automated_significant": _adm_solely_automated_significant,
     "online_childrens_service": lambda a: a.online_childrens_service_flag,
     "is_further_processing": lambda a: a.is_further_processing,
+    "has_data_categories": lambda a: bool(a.data_category_links),
 }
 
 
@@ -350,6 +353,12 @@ def _further_processing_note_present(activity: ProcessingActivity) -> str | None
     return None
 
 
+def _asset_linked_present(activity: ProcessingActivity) -> str | None:
+    if not activity.assets:
+        return "Documented processing should name the information asset(s) where the data lives"
+    return None
+
+
 REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "active_sensitive_condition": _sensitive_condition,
     "art10_basis_present": _art10_present,
@@ -369,6 +378,7 @@ REQUIREMENTS: dict[str, Callable[[ProcessingActivity], str | None]] = {
     "adm_art22_safeguards": _adm_art22_safeguards,
     "childrens_service_protections": _childrens_service_protections,
     "further_processing_note_present": _further_processing_note_present,
+    "asset_linked_present": _asset_linked_present,
 }
 
 
@@ -511,7 +521,34 @@ RULES: list[Rule] = [
         trigger="is_further_processing",
         requirement="further_processing_note_present",
     ),
+    Rule(
+        id="23",
+        description="Documented processing should name the information asset(s) where the "
+        "data lives",
+        severity=Severity.WARN,
+        trigger="has_data_categories",
+        requirement="asset_linked_present",
+    ),
 ]
+
+
+def evaluate_asset(asset: InformationAsset, linked_activity_count: int) -> Finding | None:
+    if asset.entry_status != EntryStatus.APPROVED:
+        return None
+    if not asset.contains_personal_data:
+        return None
+    if asset.status == AssetStatus.DISPOSED:
+        return None
+    if linked_activity_count > 0:
+        return None
+    return Finding(
+        rule_id="22",
+        severity=Severity.WARN,
+        message=(
+            "This asset holds personal data but is not linked to any processing activity — "
+            "possible undocumented processing"
+        ),
+    )
 
 
 def evaluate(activity: ProcessingActivity, profile: OrganisationProfile) -> list[Finding]:

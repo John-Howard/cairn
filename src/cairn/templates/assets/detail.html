@@ -21,6 +21,12 @@
 {% if can_edit %}
 <p class="govuk-body"><a class="govuk-link" href="/assets/{{ asset.id }}/edit">Edit asset</a></p>
 {% endif %}
+{% if can_create_activity and asset.entry_status.value == "approved" %}
+<form method="post" action="/assets/{{ asset.id }}/document-processing">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Document processing on this asset</button>
+</form>
+{% endif %}
 {% if can_moderate and asset.entry_status.value == "proposed" %}
 <form method="post" action="/assets/{{ asset.id }}/approve" class="govuk-!-margin-bottom-2" style="display:inline">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

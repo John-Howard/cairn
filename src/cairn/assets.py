@@ -56,7 +56,6 @@ ASSET_FIELDS: list[AssetField] = [
         "iao_user_id", "Information Asset Owner", "fk", fk_model=User, fk_label_attr="display_name"
     ),
     AssetField("custodian", "Custodian", "text"),
-    AssetField("business_function_id", "Business function", "fk", fk_model=BusinessFunction),
     AssetField(
         "classification", "Classification", "enum", required=True, enum_cls=SecurityClassification
     ),
@@ -140,6 +139,7 @@ def _new_values() -> dict:
             values[f.name] = next(iter(f.enum_cls)).value
         else:
             values[f.name] = ""
+    values["business_functions"] = []
     return values
 
 
@@ -155,6 +155,7 @@ def _entity_to_values(asset: InformationAsset) -> dict:
             values[f.name] = raw.isoformat() if raw else ""
         else:
             values[f.name] = raw if raw is not None else ""
+    values["business_functions"] = [bf.id for bf in asset.business_functions]
     return values
 
 
@@ -167,6 +168,7 @@ def _parse_form(form) -> dict:
             values[f.name] = form.get(f.name, "").strip()
         else:
             values[f.name] = form.get(f.name, "")
+    values["business_functions"] = form.getlist("business_functions")
     return values
 
 
@@ -191,10 +193,16 @@ def _validate(session: Session, values: dict) -> list[dict]:
         elif f.kind == "date":
             if value and not _valid_date(value):
                 errors.append({"field": f.name, "message": "Enter a valid date"})
+    for bf_id in values["business_functions"]:
+        if session.get(BusinessFunction, bf_id) is None:
+            errors.append(
+                {"field": "business_functions", "message": "Select a valid business function"}
+            )
+            break
     return errors
 
 
-def _apply_values(asset: InformationAsset, values: dict) -> None:
+def _apply_values(session: Session, asset: InformationAsset, values: dict) -> None:
     for f in ASSET_FIELDS:
         value = values[f.name]
         if f.kind == "bool":
@@ -207,6 +215,17 @@ def _apply_values(asset: InformationAsset, values: dict) -> None:
             setattr(asset, f.name, date.fromisoformat(value) if value else None)
         else:
             setattr(asset, f.name, value or None)
+    target_ids = set(values["business_functions"])
+    with session.no_autoflush:
+        current = {bf.id: bf for bf in asset.business_functions}
+        for bf_id, bf in current.items():
+            if bf_id not in target_ids:
+                asset.business_functions.remove(bf)
+        for bf_id in target_ids:
+            if bf_id not in current:
+                bf = session.get(BusinessFunction, bf_id)
+                if bf is not None:
+                    asset.business_functions.append(bf)
 
 
 def _format_value(asset: InformationAsset, f: AssetField, fk_maps: dict[str, dict[str, str]]):
@@ -222,11 +241,17 @@ def _format_value(asset: InformationAsset, f: AssetField, fk_maps: dict[str, dic
     return raw if raw is not None else ""
 
 
+def _business_functions_label(asset: InformationAsset) -> str:
+    return "; ".join(sorted(bf.label for bf in asset.business_functions))
+
+
 def _detail_rows(session: Session, asset: InformationAsset) -> list[dict]:
     fk_maps = _fk_maps(session)
-    return [
-        {"label": f.label, "value": _format_value(asset, f, fk_maps)} for f in ASSET_FIELDS
-    ]
+    rows = [{"label": f.label, "value": _format_value(asset, f, fk_maps)} for f in ASSET_FIELDS]
+    insert_at = next((i + 1 for i, r in enumerate(rows) if r["label"] == "Custodian"), len(rows))
+    bf_row = {"label": "Business functions", "value": _business_functions_label(asset)}
+    rows.insert(insert_at, bf_row)
+    return rows
 
 
 def _field_rows(session: Session, values: dict, error_map: dict) -> list[dict]:
@@ -270,6 +295,9 @@ def _form_context(
         "errors": errors,
         "csrf_token": csrf_token,
         "field_rows": _field_rows(session, values, error_map),
+        "business_functions": values["business_functions"],
+        "business_function_options": _business_function_options(session),
+        "business_functions_error": error_map.get("business_functions"),
     }
 
 
@@ -323,7 +351,9 @@ def _filtered_assets_query(
         except ValueError:
             pass
     if business_function_id:
-        query = query.where(InformationAsset.business_function_id == business_function_id)
+        query = query.where(
+            InformationAsset.business_functions.any(BusinessFunction.id == business_function_id)
+        )
     if iao_user_id:
         query = query.where(InformationAsset.iao_user_id == iao_user_id)
     if classification:
@@ -405,14 +435,13 @@ def list_assets(
         today=today,
     )
     assets = session.scalars(query).all()
-    function_labels = dict(_business_function_options(session))
     user_labels = dict(_user_options(session))
     rows = [
         {
             "asset": asset,
             "type_label": _enum_option_label(asset.asset_type),
             "iao_label": user_labels.get(asset.iao_user_id, ""),
-            "business_function_label": function_labels.get(asset.business_function_id, ""),
+            "business_function_label": _business_functions_label(asset),
             "classification_label": _enum_option_label(asset.classification),
             "status_label": _enum_option_label(asset.status),
             "overdue": asset.next_review_date is not None and asset.next_review_date < today,
@@ -489,12 +518,17 @@ def export_assets_csv(
     )
     assets = session.scalars(query).all()
     fk_maps = _fk_maps(session)
+    headers = [f.label for f in ASSET_FIELDS]
+    bf_index = headers.index("Custodian") + 1
+    headers.insert(bf_index, "Business functions")
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow([f.label for f in ASSET_FIELDS] + ["Entry status", "Security measures"])
+    writer.writerow(headers + ["Entry status", "Security measures"])
     for asset in assets:
+        row = [_format_value(asset, f, fk_maps) for f in ASSET_FIELDS]
+        row.insert(bf_index, _business_functions_label(asset))
         writer.writerow(
-            [_format_value(asset, f, fk_maps) for f in ASSET_FIELDS]
+            row
             + [
                 _enum_option_label(asset.entry_status),
                 "; ".join(sorted(m.label for m in asset.security_measures)),
@@ -565,7 +599,7 @@ async def create_asset(
         )
         return templates.TemplateResponse(request, "assets/form.html", context, status_code=422)
     asset = InformationAsset()
-    _apply_values(asset, values)
+    _apply_values(session, asset, values)
     if user.role == Role.CONTRIBUTOR:
         asset.entry_status = EntryStatus.PROPOSED
     session.add(asset)
@@ -653,7 +687,7 @@ async def update_asset(
         )
         return templates.TemplateResponse(request, "assets/form.html", context, status_code=422)
     change_note = form.get("change_note", "").strip()
-    _apply_values(asset, values)
+    _apply_values(session, asset, values)
     if change_note:
         asset.change_note = change_note
     session.flush()
@@ -763,7 +797,10 @@ async def document_processing(
         raise HTTPException(
             status_code=422, detail="Only approved assets can start a processing activity"
         )
-    business_function_id = asset.business_function_id or user.business_function_id
+    if len(asset.business_functions) == 1:
+        business_function_id = asset.business_functions[0].id
+    else:
+        business_function_id = user.business_function_id
     if business_function_id is None:
         raise HTTPException(
             status_code=422,

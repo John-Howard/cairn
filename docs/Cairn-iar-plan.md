@@ -42,7 +42,7 @@ Extends the current six fields. New enums in `models/enums.py`; entity stays `Pr
 | `description` | textarea | what the asset is and what information it holds, in plain English |
 | `iao_user_id` | fk → User | Information Asset Owner (decision 3). Nullable — "no IAO" is a surfaced gap, not a blocked save |
 | `custodian` | text | day-to-day custodian (person/team); free text, not forced to a user account |
-| `business_function_id` | fk → BusinessFunction | owning function; drives function-scoped views |
+| `business_functions` | fk[] junction | owning functions — one or more (multi-function requirement recorded 2026-07-28); drives function-scoped views |
 | `classification` | enum | Government Security Classifications: `official`, `official_sensitive` (+ `not_classified`). Values seeded, extensible per pack |
 | `contains_personal_data` | bool, default false | the ROPA coupling switch — drives rules 22/23 (§5) |
 | `status` | enum | `in_use`, `retiring`, `disposed` — asset lifecycle, distinct from any linked activity's `lifecycle_stage` (same separation principle as `record_status` vs `lifecycle_stage`) |

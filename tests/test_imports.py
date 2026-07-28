@@ -642,9 +642,41 @@ def test_asset_unmatched_iao_function_supplier_retention_warnings(
             select(InformationAsset).where(InformationAsset.label == "Unmatched Refs Asset")
         ).one()
         assert asset.iao_user_id is None
-        assert asset.business_function_id is None
+        assert asset.business_functions == []
         assert asset.supplier_entity_id is None
         assert asset.default_retention_id is None
+
+
+def test_asset_multiple_business_functions_matched_and_unmatched(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Dual Function Asset",
+                "asset_type": "system",
+                "business_function": f"{PREVENTION}; Not A Real Function",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "Unknown business function: &#39;Not A Real Function&#39;" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Dual Function Asset")
+        ).one()
+        assert {bf.label for bf in asset.business_functions} == {PREVENTION}
 
 
 def test_asset_duplicate_label_skipped(activities_client, activities_web_engine):

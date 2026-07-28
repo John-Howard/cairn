@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -706,6 +707,97 @@ def test_asset_invalid_asset_type_error_row(activities_client, activities_web_en
         assert matches == []
 
 
+def test_asset_next_review_date_accepts_uk_format(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "UK Date Asset",
+                "asset_type": "system",
+                "next_review_date": "01/04/2027",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "Invalid next review date" not in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "UK Date Asset")
+        ).one()
+        assert asset.next_review_date == date(2027, 4, 1)
+
+
+def test_asset_next_review_date_accepts_iso_format(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "ISO Date Asset",
+                "asset_type": "system",
+                "next_review_date": "2027-04-01",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "Invalid next review date" not in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "ISO Date Asset")
+        ).one()
+        assert asset.next_review_date == date(2027, 4, 1)
+
+
+def test_asset_next_review_date_garbage_still_errors(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Bad Date Asset",
+                "asset_type": "system",
+                "next_review_date": "not-a-date",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "Invalid next review date" in preview.text
+    assert "not-a-date" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 422
+
+    with Session(activities_web_engine) as db:
+        matches = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Bad Date Asset")
+        ).all()
+        assert matches == []
+
+
 def test_asset_security_measures_unmatched_become_proposals(
     activities_client, activities_web_engine
 ):
@@ -746,6 +838,13 @@ def test_asset_import_permissions(activities_client, activities_web_engine):
     _login(activities_client, activities_web_engine, "Cody Contributor")
     assert activities_client.get("/imports/assets/new").status_code == 403
     assert activities_client.post("/imports/assets").status_code == 403
+
+
+def test_asset_upload_form_links_csv_template(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    response = activities_client.get("/imports/assets/new")
+    assert response.status_code == 200
+    assert 'href="/static/iar-import-template.csv"' in response.text
 
 
 def test_asset_import_cancel(activities_client, activities_web_engine):

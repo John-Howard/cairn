@@ -1,7 +1,7 @@
 import csv
 import io
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
@@ -444,6 +444,14 @@ ASSET_YES_VALUES = {"yes", "y", "true"}
 ASSET_NO_VALUES = {"no", "n", "false"}
 
 
+def _parse_flexible_date(raw: str) -> date:
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        pass
+    return datetime.strptime(raw, "%d/%m/%Y").date()
+
+
 @dataclass
 class AssetRowReport:
     index: int
@@ -557,7 +565,7 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
         review_raw = (row.get("next_review_date") or "").strip()
         if review_raw:
             try:
-                values["next_review_date"] = date.fromisoformat(review_raw)
+                values["next_review_date"] = _parse_flexible_date(review_raw)
             except ValueError:
                 errors.append(f"Invalid next review date: '{review_raw}'")
                 values["next_review_date"] = None

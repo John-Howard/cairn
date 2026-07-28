@@ -20,7 +20,7 @@ Phases 1–2 complete and extended: the full application (2a–2f) plus the pull
 
 Test suite 294 passing; CI green throughout. **Remaining work before go-live is operational (staging stand-up, pilot execution) and assurance (Phase 3) — plus the items below.**
 
-**Addendum (2026-07-27):** the Information Asset Register slices **2g (IAR core) and 2h (ROPA coupling, CSV import, IAR export)** from the IAR plan (`Cairn-iar-plan.md`) are built — `SystemAsset` promoted to `InformationAsset` (migration `538c7c1b29ab`), the `/assets` module, rules 22–23, dashboard asset KPIs, the asset CSV import and the filtered IAR export. Suite 337 passing. Slice **2i (asset intake wizard)** is deferred — see item 25.
+**Addendum (2026-07-27):** the Information Asset Register slices **2g (IAR core) and 2h (ROPA coupling, CSV import, IAR export)** from the IAR plan (`Cairn-iar-plan.md`) are built — `SystemAsset` promoted to `InformationAsset` (migration `538c7c1b29ab`), the `/assets` module, rules 22–23, dashboard asset KPIs, the asset CSV import and the filtered IAR export. Suite 337 passing. Slice **2i (asset intake wizard)** is the next build slice — see item 25.
 
 ## 2. Gaps to close before or during staging *(ordered by risk)*
 
@@ -54,7 +54,7 @@ Test suite 294 passing; CI green throughout. **Remaining work before go-live is 
 22. **Automated backup verification**: the quarterly restore test is a manual runbook; scripting restore + smoke into CI-adjacent automation would make it routinely cheap.
 23. **Further sector packs** (Phase 6): police / ambulance / local authority / generic — the seams (Organisation Profile, pack seeds, profile-conditioned rules, per-pack question sets) are proven; each new pack is content work plus a legislation review.
 24. **Question Set v0.2** (planned): P5 retrospective output, folding in dry-run and pilot findings; becomes the periodic-review questionnaire (Plan §5). One candidate is already known: **merge C4/C5 into a single choice** ("our own activity / for another organisation / jointly with another organisation"), eliminating the processor-and-joint contradiction *structurally* rather than by validation (the conditional-logic slice rejects the combination with an error today, which works with v0.1 as signed off). A wording/structure change to signed content, so it takes the v0.2 route with IG sign-off — the `single_choice` kind, `depends_on` config and the C4/C5 apply mapping already support it, so the build cost is a seed edit, a data migration for the changed rows, and test updates.
-25. **IAR slice 2i — asset intake wizard** (IAR plan §5.3/§7, added 2026-07-27): the guided, jargon-free asset question set for asset owners, producing proposed assets and gap records. Prerequisite is the `question_set` discriminator (`activity` | `asset`) on the intake tables — the same generalisation that serves item 8 (question-set admin) and the reseed mechanics in item 7 — plus a new *Cairn IAR Question Set v0.1* document. Sequence during pilot rollout waves; 2g–2h already give the pilot its inventory step (CSV import of the ICT application list at P1) without it.
+25. **IAR slice 2i — asset intake wizard** — **NEXT BUILD SLICE (marked 2026-07-28)** (IAR plan §5.3/§7, added 2026-07-27): the guided, jargon-free asset question set for asset owners, producing proposed assets and gap records. Prerequisite is the `question_set` discriminator (`activity` | `asset`) on the intake tables — the same generalisation that serves item 8 (question-set admin) and the reseed mechanics in item 7 — plus a new *Cairn IAR Question Set v0.1* document. 2g–2h already give the pilot its inventory step (CSV import of the ICT application list at P1), so 2i can build in parallel with early pilot stages.
 
 ## 5. Standing assurance items (Phase 3, unchanged but restated)
 
@@ -68,9 +68,10 @@ Test suite 294 passing; CI green throughout. **Remaining work before go-live is 
 
 | When | Items |
 |---|---|
+| **Next build slice** | **25 IAR slice 2i — asset intake wizard** (marked 2026-07-28) |
 | Before staging holds real data | 6 DPIA delta *(1, 3, 4 done 2026-07-17)* · 7 intake-question reseed check |
 | At first staging deployment | 5 Entra round-trip verification *(2 done 2026-07-17)* |
-| During pilot (as evidence arrives) | 8–14 · 25 IAR asset intake (rollout waves) |
+| During pilot (as evidence arrives) | 8–14 |
 | Before go-live | Phase 3 items (§5) · 15 notifications |
 | Post go-live / roadmap | 16–24 |
 

@@ -23,6 +23,7 @@ from cairn.models import (
     EntryStatus,
     ExternalDataSource,
     ExternalDataUseMode,
+    InformationAsset,
     LEClassification,
     LegalEntity,
     LifecycleStage,
@@ -38,7 +39,6 @@ from cairn.models import (
     Regime,
     RegimeSource,
     Role,
-    SystemAsset,
     User,
 )
 from cairn.regime import override_activity_regime, resolve_regime
@@ -150,7 +150,7 @@ class SimpleJunction:
 SIMPLE_JUNCTIONS: dict[str, SimpleJunction] = {
     "data-subjects": SimpleJunction("data_subjects", DataSubjectCategory, "data subject"),
     "recipients": SimpleJunction("recipients", Recipient, "recipient"),
-    "systems": SimpleJunction("systems", SystemAsset, "system"),
+    "assets": SimpleJunction("assets", InformationAsset, "asset"),
     "data-sources": SimpleJunction("data_sources", ExternalDataSource, "external data source"),
     "controllers": SimpleJunction("controllers", LegalEntity, "controller (legal entity)"),
     "privacy-notices": SimpleJunction("privacy_notices", PrivacyNotice, "privacy notice"),
@@ -159,7 +159,7 @@ SIMPLE_JUNCTIONS: dict[str, SimpleJunction] = {
 SECTION_TITLES = {
     "data-subjects": "Data subjects",
     "recipients": "Recipients",
-    "systems": "Systems",
+    "assets": "Assets",
     "data-sources": "External data sources",
     "controllers": "Controllers",
     "privacy-notices": "Privacy notices",
@@ -168,7 +168,7 @@ SECTION_TITLES = {
 JUNCTION_CONTEXT_KEYS = {
     "data-subjects": ("data_subjects", "data_subject_options"),
     "recipients": ("recipients", "recipient_options"),
-    "systems": ("systems", "system_options"),
+    "assets": ("assets", "asset_options"),
     "data-sources": ("data_sources", "data_source_options"),
     "controllers": ("controllers", "controller_options"),
     "privacy-notices": ("privacy_notices", "privacy_notice_options"),
@@ -458,7 +458,7 @@ def _form_context(
 def _junction_context(session: Session, activity: ProcessingActivity) -> dict:
     linked_subject_ids = {s.id for s in activity.data_subjects}
     linked_recipient_ids = {r.id for r in activity.recipients}
-    linked_system_ids = {s.id for s in activity.systems}
+    linked_asset_ids = {s.id for s in activity.assets}
     linked_source_ids = {s.id for s in activity.data_sources}
     linked_controller_ids = {c.id for c in activity.controllers}
     linked_notice_ids = {n.id for n in activity.privacy_notices}
@@ -473,8 +473,8 @@ def _junction_context(session: Session, activity: ProcessingActivity) -> dict:
         ),
         "recipients": [(r.id, _display_label(r)) for r in activity.recipients],
         "recipient_options": _available_options(session, Recipient, linked_recipient_ids),
-        "systems": [(s.id, _display_label(s)) for s in activity.systems],
-        "system_options": _available_options(session, SystemAsset, linked_system_ids),
+        "assets": [(s.id, _display_label(s)) for s in activity.assets],
+        "asset_options": _available_options(session, InformationAsset, linked_asset_ids),
         "data_sources": [(s.id, _display_label(s)) for s in activity.data_sources],
         "data_source_options": _available_options(session, ExternalDataSource, linked_source_ids),
         "controllers": [(c.id, _display_label(c)) for c in activity.controllers],
@@ -998,7 +998,7 @@ async def add_simple_junction(
     if item not in collection:
         collection.append(item)
         session.flush()
-        if kind == "systems":
+        if kind == "assets":
             sync_inherited_security(session, activity)
     return _junction_fragment_response(request, session, activity, kind)
 
@@ -1024,6 +1024,6 @@ async def remove_simple_junction(
     if item is not None and item in collection:
         collection.remove(item)
         session.flush()
-        if kind == "systems":
+        if kind == "assets":
             sync_inherited_security(session, activity)
     return _junction_fragment_response(request, session, activity, kind)

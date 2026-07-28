@@ -9,6 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import cairn
 from cairn.activities import router as activities_router
+from cairn.assets import router as assets_router
 from cairn.auth import LoginRequired
 from cairn.auth import router as auth_router
 from cairn.basis import router as basis_router
@@ -79,6 +80,11 @@ def create_app() -> FastAPI:
         return RedirectResponse("/login", status_code=302)
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    # The IAR router below owns "/assets" for its own routes (register, detail, etc);
+    # it must be included before this mount so its exact-path routes are matched first.
+    # Static GOVUK asset requests (e.g. /assets/images/...) are two-plus segments deep
+    # and fall through to the mount untouched.
+    app.include_router(assets_router)
     app.mount("/assets", StaticFiles(directory=str(GOVUK_ASSETS_DIR)), name="govuk-assets")
 
     @app.get("/healthz")

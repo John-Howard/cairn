@@ -169,8 +169,8 @@ def _legal_basis(activity: ProcessingActivity) -> str:
     return "; ".join(p for p in parts if p)
 
 
-def _s62_systems(activity: ProcessingActivity) -> str:
-    return _join(s.label for s in activity.systems if s.s62_logging_in_scope)
+def _s62_assets(activity: ProcessingActivity) -> str:
+    return _join(a.label for a in activity.assets if a.s62_logging_in_scope)
 
 
 ART30_1_COLUMNS = [
@@ -268,7 +268,7 @@ S61_COLUMNS = [
     ExportColumn(
         "Security measures", lambda a, ctx: _join(_security(link) for link in a.security_links)
     ),
-    ExportColumn("Systems in scope for s62 logging", lambda a, ctx: _s62_systems(a)),
+    ExportColumn("Systems in scope for s62 logging", lambda a, ctx: _s62_assets(a)),
     ExportColumn("s62 logging note", lambda a, ctx: a.s62_logging_note or ""),
 ]
 
@@ -295,7 +295,7 @@ COMBINED_COLUMNS = [
         lambda a, ctx: _join(_category(link, ctx) for link in a.data_category_links),
     ),
     ExportColumn("Recipients", lambda a, ctx: _join(r.label for r in a.recipients)),
-    ExportColumn("Systems", lambda a, ctx: _join(s.label for s in a.systems)),
+    ExportColumn("Systems", lambda a, ctx: _join(s.label for s in a.assets)),
     ExportColumn("Special category", lambda a, ctx: "yes" if a.special_category_flag else ""),
     ExportColumn("Criminal offence", lambda a, ctx: "yes" if a.criminal_offence_flag else ""),
     ExportColumn("ADM/profiling", lambda a, ctx: "yes" if a.adm_profiling_flag else ""),

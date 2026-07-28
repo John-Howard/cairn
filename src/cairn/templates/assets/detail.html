@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.label }}{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">{{ asset.label }}</h1>
+
+<p class="govuk-body">
+  {% if asset.entry_status.value == "proposed" %}<strong class="govuk-tag govuk-tag--blue">Proposed</strong>{% endif %}
+  {% if asset.entry_status.value == "rejected" %}<strong class="govuk-tag govuk-tag--grey">Rejected</strong>{% endif %}
+</p>
+
+{% for gap in gap_flags %}
+<div class="govuk-warning-text">
+  <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+  <strong class="govuk-warning-text__text">
+    <span class="govuk-visually-hidden">Warning</span>
+    {{ gap }}
+  </strong>
+</div>
+{% endfor %}
+
+{% if can_edit %}
+<p class="govuk-body"><a class="govuk-link" href="/assets/{{ asset.id }}/edit">Edit asset</a></p>
+{% endif %}
+{% if can_moderate and asset.entry_status.value == "proposed" %}
+<form method="post" action="/assets/{{ asset.id }}/approve" class="govuk-!-margin-bottom-2" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="govuk-button govuk-button--secondary">Approve</button>
+</form>
+<form method="post" action="/assets/{{ asset.id }}/reject" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="text" class="govuk-input govuk-input--width-10" name="reason" placeholder="Reason (optional)">
+  <button type="submit" class="govuk-button govuk-button--warning">Reject</button>
+</form>
+{% endif %}
+
+<h2 class="govuk-heading-m">Details</h2>
+<dl class="govuk-summary-list">
+  {% for row in detail_rows %}
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">{{ row.label }}</dt>
+    <dd class="govuk-summary-list__value">{{ row.value }}</dd>
+  </div>
+  {% endfor %}
+</dl>
+
+<h2 class="govuk-heading-m">Security measures</h2>
+<table class="govuk-table">
+  <tbody class="govuk-table__body">
+    {% for item_id, label in security_measures %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ label }}</td>
+      <td class="govuk-table__cell">
+        {% if can_edit %}
+        <form method="post" action="/assets/{{ asset.id }}/security-measures/{{ item_id }}/remove">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="2">None linked.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if can_edit and security_measure_options %}
+<form method="post" action="/assets/{{ asset.id }}/security-measures">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <select class="govuk-select" name="item_id">
+    {% for value, text in security_measure_options %}
+    <option value="{{ value }}">{{ text }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Add</button>
+</form>
+{% endif %}
+
+<h2 class="govuk-heading-m">Linked processing activities</h2>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Record status</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for activity in linked_activities %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell"><a class="govuk-link" href="/activities/{{ activity.id }}">{{ activity.name }}</a></td>
+      <td class="govuk-table__cell"><strong class="govuk-tag">{{ activity.record_status.value }}</strong></td>
+    </tr>
+    {% else %}
+    <tr class="govuk-table__row"><td class="govuk-table__cell" colspan="2">No processing activities linked.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p class="govuk-body"><a class="govuk-link" href="/assets">Back to Information Asset Register</a></p>
+{% endblock %}

@@ -5,10 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cairn.models import (
+    AssetType,
     AuditEvent,
     EntryStatus,
     ImportBatch,
     ImportBatchStatus,
+    InformationAsset,
     ProcessingActivity,
     Recipient,
     RecipientType,
@@ -124,6 +126,46 @@ def test_happy_path_confirm_creates_activities(activities_client, activities_web
         ).all()
         assert len(events) == 1
         assert set(events[0].new_value["activities"]) == {a.id for a in activities}
+
+
+def test_unmatched_system_column_creates_proposed_information_asset(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports")
+
+    upload = _upload(
+        activities_client,
+        token,
+        [
+            {
+                "name": "Activity With System",
+                "business_function": PREVENTION,
+                "purpose": "Purpose",
+                "personal_data_source": "from_data_subject",
+                "systems": "Case Management System",
+            },
+        ],
+    )
+    assert upload.status_code == 302
+    batch_id = upload.headers["location"].removeprefix("/imports/")
+    preview = activities_client.get(f"/imports/{batch_id}")
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Case Management System")
+        ).one()
+        assert asset.entry_status == EntryStatus.PROPOSED
+        assert asset.asset_type == AssetType.SYSTEM
+        assert asset.contains_personal_data is True
+
+        activity = db.scalars(
+            select(ProcessingActivity).where(ProcessingActivity.name == "Activity With System")
+        ).one()
+        assert asset in activity.assets
 
 
 def test_preview_creates_nothing(activities_client, activities_web_engine):

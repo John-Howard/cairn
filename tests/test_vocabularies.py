@@ -42,7 +42,6 @@ def test_index_lists_vocabularies_with_counts(activities_client, activities_web_
         "personal-data-categories",
         "recipients",
         "security-measures",
-        "systems",
         "retention-rules",
         "legal-entities",
         "external-data-sources",
@@ -56,6 +55,12 @@ def test_index_lists_vocabularies_with_counts(activities_client, activities_web_
     assert f">{function_count}<" in _index_row(response.text, "business-functions")
     assert f">{basis_count}<" in _index_row(response.text, "lawful-bases-general")
     assert "Read-only" in _index_row(response.text, "lawful-bases-general")
+    assert 'href="/assets"' in response.text
+
+
+def test_systems_vocab_removed_in_favour_of_assets(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    assert activities_client.get("/vocabularies/systems").status_code == 404
 
 
 def test_curator_creates_and_edits_entry(activities_client, activities_web_engine):

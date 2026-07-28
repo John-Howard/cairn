@@ -3,10 +3,10 @@ from datetime import date
 from cairn.inheritance import sync_inherited_security
 from cairn.models import (
     ActivitySecurity,
+    InformationAsset,
     ProcessingActivity,
     SecurityMeasure,
     SecurityMeasureCategory,
-    SystemAsset,
 )
 from conftest import business_function
 
@@ -28,7 +28,7 @@ def make_activity(session, actor, **overrides):
 
 
 def make_system(session, label, *measures):
-    system = SystemAsset(label=label)
+    system = InformationAsset(label=label)
     system.security_measures.extend(measures)
     session.add(system)
     session.flush()
@@ -54,7 +54,7 @@ def test_sync_creates_inherited_rows_for_union_of_linked_systems(session, actor)
     system_b = make_system(session, "System B", mfa, logging_measure)
 
     activity = make_activity(session, actor)
-    activity.systems.extend([system_a, system_b])
+    activity.assets.extend([system_a, system_b])
     session.flush()
 
     sync_inherited_security(session, activity)
@@ -72,7 +72,7 @@ def test_sync_is_idempotent(session, actor):
     system_a = make_system(session, "System A", encryption)
 
     activity = make_activity(session, actor)
-    activity.systems.append(system_a)
+    activity.assets.append(system_a)
     session.flush()
 
     sync_inherited_security(session, activity)
@@ -89,13 +89,13 @@ def test_unlinking_system_removes_exclusive_inherited_rows_but_keeps_shared(sess
     system_b = make_system(session, "System B", mfa)
 
     activity = make_activity(session, actor)
-    activity.systems.extend([system_a, system_b])
+    activity.assets.extend([system_a, system_b])
     session.flush()
     sync_inherited_security(session, activity)
     session.refresh(activity)
     assert set(_links_by_measure(activity)) == {encryption.id, mfa.id}
 
-    activity.systems.remove(system_a)
+    activity.assets.remove(system_a)
     session.flush()
     sync_inherited_security(session, activity)
     session.refresh(activity)
@@ -123,7 +123,7 @@ def test_manual_row_is_never_touched(session, actor):
     assert len(links) == 1
     assert links[encryption.id].inherited_from_system is False
 
-    activity.systems.append(system_a)
+    activity.assets.append(system_a)
     session.flush()
     sync_inherited_security(session, activity)
     session.refresh(activity)
@@ -132,7 +132,7 @@ def test_manual_row_is_never_touched(session, actor):
     assert len(links) == 1
     assert links[encryption.id].inherited_from_system is False
 
-    activity.systems.remove(system_a)
+    activity.assets.remove(system_a)
     session.flush()
     sync_inherited_security(session, activity)
     session.refresh(activity)
@@ -148,7 +148,7 @@ def test_manual_row_for_non_inherited_measure_untouched_when_system_unlinked(ses
     system_a = make_system(session, "System A", encryption)
 
     activity = make_activity(session, actor)
-    activity.systems.append(system_a)
+    activity.assets.append(system_a)
     manual = ActivitySecurity(
         activity_id=activity.id, security_measure_id=other.id, inherited_from_system=False
     )
@@ -160,7 +160,7 @@ def test_manual_row_for_non_inherited_measure_untouched_when_system_unlinked(ses
     links = _links_by_measure(activity)
     assert set(links) == {encryption.id, other.id}
 
-    activity.systems.remove(system_a)
+    activity.assets.remove(system_a)
     session.flush()
     sync_inherited_security(session, activity)
     session.refresh(activity)

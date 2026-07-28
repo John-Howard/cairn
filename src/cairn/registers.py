@@ -1277,17 +1277,17 @@ def _retention_suggestions(activity: ProcessingActivity, rule_labels: dict[str, 
     }
     suggestions = []
     seen_rules = set()
-    for system in activity.systems:
-        if system.default_retention_id is None or system.default_retention_id in seen_rules:
+    for asset in activity.assets:
+        if asset.default_retention_id is None or asset.default_retention_id in seen_rules:
             continue
-        if (system.default_retention_id, None) in existing:
+        if (asset.default_retention_id, None) in existing:
             continue
-        seen_rules.add(system.default_retention_id)
+        seen_rules.add(asset.default_retention_id)
         suggestions.append(
             {
-                "system_label": _display_label(system),
-                "rule_id": system.default_retention_id,
-                "rule_label": rule_labels.get(system.default_retention_id, ""),
+                "system_label": _display_label(asset),
+                "rule_id": asset.default_retention_id,
+                "rule_label": rule_labels.get(asset.default_retention_id, ""),
             }
         )
     return suggestions

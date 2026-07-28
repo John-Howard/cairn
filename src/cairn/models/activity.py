@@ -20,12 +20,12 @@ from cairn.models.enums import (
 from cairn.models.vocab import (
     DataSubjectCategory,
     ExternalDataSource,
+    InformationAsset,
     LegalEntity,
     PersonalDataCategory,
     Recipient,
     RetentionRule,
     SecurityMeasure,
-    SystemAsset,
 )
 
 if TYPE_CHECKING:
@@ -52,11 +52,11 @@ activity_recipient = Table(
     Column("recipient_id", ForeignKey("recipient.id"), primary_key=True),
 )
 
-activity_system = Table(
-    "activity_system",
+activity_asset = Table(
+    "activity_asset",
     Base.metadata,
     Column("activity_id", ForeignKey("processing_activity.id"), primary_key=True),
-    Column("system_id", ForeignKey("system_asset.id"), primary_key=True),
+    Column("asset_id", ForeignKey("information_asset.id"), primary_key=True),
 )
 
 activity_contract = Table(
@@ -134,7 +134,7 @@ class ProcessingActivity(AuditedBase):
     data_subjects: Mapped[list[DataSubjectCategory]] = relationship(secondary=activity_datasubject)
     data_sources: Mapped[list[ExternalDataSource]] = relationship(secondary=activity_datasource)
     recipients: Mapped[list[Recipient]] = relationship(secondary=activity_recipient)
-    systems: Mapped[list[SystemAsset]] = relationship(secondary=activity_system)
+    assets: Mapped[list[InformationAsset]] = relationship(secondary=activity_asset)
     controllers: Mapped[list[LegalEntity]] = relationship(secondary=activity_controller)
     contracts: Mapped[list[ContractDSA]] = relationship(
         "ContractDSA", secondary="activity_contract"

@@ -93,8 +93,11 @@ flowchart LR
 | 2d Hybrid workflow | Roles/permissions, **intake wizard (pulled forward with 2a as the pilot-enabling milestone — see Intake & Pilot Plan)**, propose-and-approve reference data, review cycles, trial lifecycle gates |
 | 2e Assurance & export | Mapping layer → Art 30(1)/30(2)/s61 + combined views, ICO-ready export, dashboards, KPIs, overdue-review & trial-expiry alerts |
 | 2f DUAA alignment | ADM (Art 22A–22D) safeguards, statutory complaints capability (s164A), transfer "not materially lower" test (s85), children's higher-protection matters, purpose-limitation/further-processing |
+| 2g IAR core *(added 2026-07 — `Cairn-iar-plan.md` §7)* | Information Asset Register module: `SystemAsset` promoted to `InformationAsset` (types, IAO/custodian, classification, personal-data flag, review dates), `/assets` register/detail/forms with propose-and-approve, security-measure junction editor. **Built 2026-07-27.** |
+| 2h IAR coupling + import *(added 2026-07)* | Activity-from-asset, governance rules 22–23, dashboard asset KPIs, asset CSV import (Integration Architecture #3), filtered IAR CSV export. **Built 2026-07-27.** |
+| 2i Asset intake wizard *(added 2026-07 — deferred)* | Guided asset question set over a generalised (`question_set`-discriminated) intake engine; sequence during pilot rollout waves (backlog item 25). |
 
-**Deliverables:** working Cairn application (FRS pack), incrementally through 2a→2f.
+**Deliverables:** working Cairn application (FRS pack), incrementally through 2a→2f; IAR extension 2g–2h (2i deferred to rollout).
 
 **Dependency:** Phase 1 (schema, environments, prototype).
 

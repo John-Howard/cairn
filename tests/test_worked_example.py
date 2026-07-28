@@ -17,6 +17,7 @@ from cairn.models import (
     DecisionSupportADM,
     ExternalDataSource,
     ExternalDataUseMode,
+    InformationAsset,
     LawfulBasisRecord,
     LegalEntity,
     LegalEntityRoleType,
@@ -172,6 +173,11 @@ def test_hfsv_risk_model_feeds_operational_targeting(session, actor, frs_profile
             residual_risk=ResidualRisk.LOW,
         )
     )
+    risk_platform = InformationAsset(label="HFSV Household Risk Model Platform")
+    session.add(risk_platform)
+    session.flush()
+    model.assets.append(risk_platform)
+    operational.assets.append(risk_platform)
     session.flush()
     session.expire_all()
 

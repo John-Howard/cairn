@@ -6,11 +6,15 @@
   <div class="govuk-grid-column-two-thirds">
     <h1 class="govuk-heading-l">Information Asset Register</h1>
   </div>
-  {% if can_add %}
   <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+    {% if can_moderate %}
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="/imports/assets/new">Import assets</a>
+    {% endif %}
+    <a class="govuk-button govuk-button--secondary" data-module="govuk-button" href="{{ export_href }}">Export CSV</a>
+    {% if can_add %}
     <a class="govuk-button" data-module="govuk-button" href="/assets/new">Add asset</a>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 
 <p class="govuk-body"><a class="govuk-link" href="/assets?mine=true">My assets</a></p>

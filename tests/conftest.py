@@ -13,6 +13,7 @@ from cairn.models import (
     AppropriatePolicyDocument,
     Base,
     BusinessFunction,
+    InformationAsset,
     LawfulBasisGeneral,
     LawfulBasisLE,
     LawfulBasisRecord,
@@ -177,6 +178,8 @@ def enforcement_activity(session, actor, criminal_category):
         )
     )
     session.add(activity)
+    session.flush()
+    activity.assets.append(InformationAsset(label="Enforcement Case Management System"))
     session.flush()
     return activity
 

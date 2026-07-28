@@ -14,6 +14,7 @@ from cairn.db import get_session
 from cairn.inheritance import sync_inherited_security
 from cairn.models import (
     ActivityDomain,
+    AssetStatus,
     AssetType,
     BusinessFunction,
     DataSubjectCategory,
@@ -21,6 +22,7 @@ from cairn.models import (
     ImportBatch,
     ImportBatchStatus,
     InformationAsset,
+    LegalEntity,
     PersonalDataCategory,
     PersonalDataSource,
     ProcessingActivity,
@@ -28,7 +30,11 @@ from cairn.models import (
     RecipientType,
     RecordStatus,
     RegimeSource,
+    RetentionRule,
     Role,
+    SecurityClassification,
+    SecurityMeasure,
+    SecurityMeasureCategory,
     User,
 )
 from cairn.regime import resolve_regime
@@ -431,3 +437,389 @@ async def import_cancel(
     session.flush()
     record_event(session, entity=batch, event="import_cancelled", actor=user)
     return RedirectResponse("/imports", status_code=302)
+
+
+ASSET_REQUIRED_HEADERS = ("label", "asset_type")
+ASSET_YES_VALUES = {"yes", "y", "true"}
+ASSET_NO_VALUES = {"no", "n", "false"}
+
+
+@dataclass
+class AssetRowReport:
+    index: int
+    values: dict
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    is_duplicate: bool = False
+    security_measure_matches: list[tuple[str, str]] = field(default_factory=list)
+    security_measure_proposals: list[str] = field(default_factory=list)
+
+
+def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowReport]:
+    existing_labels = {a.label.lower() for a in session.scalars(select(InformationAsset)).all()}
+    business_functions = {
+        bf.label.lower(): bf for bf in session.scalars(select(BusinessFunction)).all()
+    }
+    users_by_email = {u.email.lower(): u for u in session.scalars(select(User)).all() if u.email}
+    suppliers = {le.label.lower(): le for le in session.scalars(select(LegalEntity)).all()}
+    retention_rules = {
+        r.label.lower(): r
+        for r in session.scalars(select(RetentionRule)).all()
+        if r.entry_status != EntryStatus.REJECTED
+    }
+    measure_active, measure_rejected = _vocab_maps(session, SecurityMeasure)
+    proposal_registry: dict[str, str] = {}
+
+    reports = []
+    for index, row in enumerate(rows, start=1):
+        errors: list[str] = []
+        warnings: list[str] = []
+        values: dict = {}
+
+        label = (row.get("label") or "").strip()
+        values["label"] = label
+        if not label:
+            errors.append("Enter a label")
+
+        is_duplicate = bool(label) and label.lower() in existing_labels
+        if is_duplicate:
+            warnings.append(f"An asset named '{label}' already exists — this row will be skipped")
+
+        asset_type_raw = (row.get("asset_type") or "").strip()
+        if not asset_type_raw:
+            errors.append("Enter an asset type")
+            values["asset_type"] = None
+        else:
+            try:
+                values["asset_type"] = AssetType(asset_type_raw.lower())
+            except ValueError:
+                errors.append(f"Unknown asset type: '{asset_type_raw}'")
+                values["asset_type"] = None
+
+        values["description"] = (row.get("description") or "").strip() or None
+        values["custodian"] = (row.get("custodian") or "").strip() or None
+        values["location"] = (row.get("location") or "").strip() or None
+        values["hosting_country"] = (row.get("hosting_country") or "").strip() or None
+
+        iao_email = (row.get("iao_email") or "").strip()
+        if iao_email:
+            matched_user = users_by_email.get(iao_email.lower())
+            if matched_user is None:
+                warnings.append(f"Unknown IAO email: '{iao_email}' — leaving IAO unset")
+                values["iao_user_id"] = None
+            else:
+                values["iao_user_id"] = matched_user.id
+        else:
+            values["iao_user_id"] = None
+
+        function_raw = (row.get("business_function") or "").strip()
+        if function_raw:
+            bf = business_functions.get(function_raw.lower())
+            if bf is None:
+                warnings.append(f"Unknown business function: '{function_raw}' — leaving unset")
+                values["business_function_id"] = None
+            else:
+                values["business_function_id"] = bf.id
+        else:
+            values["business_function_id"] = None
+
+        classification_raw = (row.get("classification") or "").strip()
+        if classification_raw:
+            try:
+                values["classification"] = SecurityClassification(classification_raw.lower())
+            except ValueError:
+                errors.append(f"Unknown classification: '{classification_raw}'")
+                values["classification"] = None
+        else:
+            values["classification"] = None
+
+        personal_data_raw = (row.get("contains_personal_data") or "").strip().lower()
+        if not personal_data_raw:
+            values["contains_personal_data"] = None
+        elif personal_data_raw in ASSET_YES_VALUES:
+            values["contains_personal_data"] = True
+        elif personal_data_raw in ASSET_NO_VALUES:
+            values["contains_personal_data"] = False
+        else:
+            errors.append(f"Unknown value for contains personal data: '{personal_data_raw}'")
+            values["contains_personal_data"] = None
+
+        status_raw = (row.get("status") or "").strip()
+        if status_raw:
+            try:
+                values["status"] = AssetStatus(status_raw.lower())
+            except ValueError:
+                errors.append(f"Unknown status: '{status_raw}'")
+                values["status"] = None
+        else:
+            values["status"] = None
+
+        review_raw = (row.get("next_review_date") or "").strip()
+        if review_raw:
+            try:
+                values["next_review_date"] = date.fromisoformat(review_raw)
+            except ValueError:
+                errors.append(f"Invalid next review date: '{review_raw}'")
+                values["next_review_date"] = None
+        else:
+            values["next_review_date"] = None
+
+        supplier_raw = (row.get("supplier") or "").strip()
+        if supplier_raw:
+            supplier = suppliers.get(supplier_raw.lower())
+            if supplier is None:
+                warnings.append(f"Unknown supplier: '{supplier_raw}' — leaving unset")
+                values["supplier_entity_id"] = None
+            else:
+                values["supplier_entity_id"] = supplier.id
+        else:
+            values["supplier_entity_id"] = None
+
+        retention_raw = (row.get("retention_rule") or "").strip()
+        if retention_raw:
+            rule = retention_rules.get(retention_raw.lower())
+            if rule is None:
+                warnings.append(f"Unknown retention rule: '{retention_raw}' — leaving unset")
+                values["default_retention_id"] = None
+            else:
+                values["default_retention_id"] = rule.id
+        else:
+            values["default_retention_id"] = None
+
+        measures_raw = (row.get("security_measures") or "").strip()
+        measure_matches: list[tuple[str, str]] = []
+        measure_proposals: list[str] = []
+        for token_name in _split_names(measures_raw):
+            key = token_name.lower()
+            entry = measure_active.get(key)
+            if entry is not None:
+                measure_matches.append((entry.id, entry.label))
+                continue
+            if key in measure_rejected:
+                errors.append(f"'{token_name}' was previously rejected")
+                continue
+            canonical = proposal_registry.setdefault(key, token_name)
+            if canonical not in measure_proposals:
+                measure_proposals.append(canonical)
+
+        reports.append(
+            AssetRowReport(
+                index=index,
+                values=values,
+                errors=errors,
+                warnings=warnings,
+                is_duplicate=is_duplicate,
+                security_measure_matches=measure_matches,
+                security_measure_proposals=measure_proposals,
+            )
+        )
+    return reports
+
+
+def apply_asset_batch(
+    session: Session, reports: list[AssetRowReport], actor: User
+) -> tuple[list[InformationAsset], list[str]]:
+    proposal_names: dict[str, str] = {}
+    for report in reports:
+        for name in report.security_measure_proposals:
+            proposal_names.setdefault(name.lower(), name)
+    proposal_entities: dict[str, SecurityMeasure] = {}
+    for key, name in proposal_names.items():
+        entry = SecurityMeasure(
+            label=name,
+            category=SecurityMeasureCategory.TECHNICAL,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        session.add(entry)
+        proposal_entities[key] = entry
+    session.flush()
+
+    assets = []
+    for report in reports:
+        if report.is_duplicate:
+            continue
+        values = report.values
+        asset = InformationAsset(label=values["label"], asset_type=values["asset_type"])
+        for field_name in (
+            "description",
+            "iao_user_id",
+            "custodian",
+            "business_function_id",
+            "classification",
+            "contains_personal_data",
+            "status",
+            "next_review_date",
+            "supplier_entity_id",
+            "location",
+            "hosting_country",
+            "default_retention_id",
+        ):
+            value = values[field_name]
+            if value is not None:
+                setattr(asset, field_name, value)
+        asset.entry_status = EntryStatus.APPROVED
+        session.add(asset)
+        session.flush()
+        for entry_id, _label in report.security_measure_matches:
+            measure = session.get(SecurityMeasure, entry_id)
+            asset.security_measures.append(measure)
+        for name in report.security_measure_proposals:
+            asset.security_measures.append(proposal_entities[name.lower()])
+        assets.append(asset)
+    session.flush()
+    return assets, [entry.id for entry in proposal_entities.values()]
+
+
+def _asset_upload_response(
+    request: Request, user: User, *, error: str | None = None, status_code: int = 200
+):
+    return templates.TemplateResponse(
+        request,
+        "imports/assets_upload.html",
+        {"user": user, "csrf_token": get_csrf_token(request), "error": error},
+        status_code=status_code,
+    )
+
+
+def _asset_preview_response(
+    request: Request,
+    user: User,
+    batch: ImportBatch,
+    reports: list[AssetRowReport],
+    *,
+    status_code: int = 200,
+):
+    error_rows = sum(1 for r in reports if r.errors)
+    warning_rows = sum(1 for r in reports if r.warnings and not r.errors)
+    duplicate_rows = sum(1 for r in reports if r.is_duplicate)
+    context = {
+        "user": user,
+        "batch": batch,
+        "processed": False,
+        "reports": reports,
+        "row_count": len(reports),
+        "error_count": error_rows,
+        "warning_count": warning_rows,
+        "duplicate_count": duplicate_rows,
+        "can_confirm": error_rows == 0,
+        "csrf_token": get_csrf_token(request),
+    }
+    return templates.TemplateResponse(
+        request, "imports/assets_preview.html", context, status_code=status_code
+    )
+
+
+@router.get("/imports/assets/new")
+def import_asset_upload_form(request: Request, user: User = Depends(require_curator_or_approver)):
+    return _asset_upload_response(request, user)
+
+
+@router.post("/imports/assets")
+async def import_asset_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    csrf_token: str = Form(...),
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    verify_csrf(request, csrf_token)
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return _asset_upload_response(
+            request, user, error="Could not read the file as UTF-8 text", status_code=422
+        )
+    reader = csv.DictReader(io.StringIO(text))
+    fieldnames = reader.fieldnames or []
+    missing = [h for h in ASSET_REQUIRED_HEADERS if h not in fieldnames]
+    if missing:
+        return _asset_upload_response(
+            request,
+            user,
+            error=f"Missing required column(s): {', '.join(missing)}",
+            status_code=422,
+        )
+    rows = [
+        {key: (value or "").strip() for key, value in row.items() if key is not None}
+        for row in reader
+    ]
+    if not rows:
+        return _asset_upload_response(
+            request, user, error="The CSV file has no data rows", status_code=422
+        )
+    batch = ImportBatch(filename=file.filename or "assets.csv", rows=rows)
+    session.add(batch)
+    session.flush()
+    return RedirectResponse(f"/imports/assets/{batch.id}", status_code=302)
+
+
+@router.get("/imports/assets/{batch_id}")
+def import_asset_preview(
+    batch_id: str,
+    request: Request,
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    batch = _get_batch(session, batch_id)
+    if batch.status != ImportBatchStatus.PENDING:
+        return templates.TemplateResponse(
+            request,
+            "imports/assets_preview.html",
+            {
+                "user": user,
+                "batch": batch,
+                "processed": True,
+                "csrf_token": get_csrf_token(request),
+            },
+        )
+    reports = analyse_asset_rows(session, batch.rows)
+    return _asset_preview_response(request, user, batch, reports)
+
+
+@router.post("/imports/assets/{batch_id}/confirm")
+async def import_asset_confirm(
+    batch_id: str,
+    request: Request,
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    batch = _get_batch(session, batch_id)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if batch.status != ImportBatchStatus.PENDING:
+        raise HTTPException(status_code=422, detail="Batch has already been processed")
+    reports = analyse_asset_rows(session, batch.rows)
+    if any(r.errors for r in reports):
+        return _asset_preview_response(request, user, batch, reports, status_code=422)
+    assets, proposal_ids = apply_asset_batch(session, reports, user)
+    batch.status = ImportBatchStatus.CONFIRMED
+    batch.change_note = "Asset import confirmed"
+    session.flush()
+    record_event(
+        session,
+        entity=batch,
+        event="asset_import_confirmed",
+        actor=user,
+        new_value={"assets": [a.id for a in assets], "proposals": proposal_ids},
+    )
+    return RedirectResponse("/assets", status_code=302)
+
+
+@router.post("/imports/assets/{batch_id}/cancel")
+async def import_asset_cancel(
+    batch_id: str,
+    request: Request,
+    user: User = Depends(require_curator_or_approver),
+    session: Session = Depends(get_session),
+):
+    batch = _get_batch(session, batch_id)
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    if batch.status != ImportBatchStatus.PENDING:
+        raise HTTPException(status_code=422, detail="Batch has already been processed")
+    batch.status = ImportBatchStatus.CANCELLED
+    batch.change_note = "Asset import cancelled"
+    session.flush()
+    record_event(session, entity=batch, event="asset_import_cancelled", actor=user)
+    return RedirectResponse("/imports/assets/new", status_code=302)

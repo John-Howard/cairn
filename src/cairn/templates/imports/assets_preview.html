@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Asset import preview{% endblock %}
+{% block content %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-full">
+    <h1 class="govuk-heading-l">Asset import preview — {{ batch.filename }}</h1>
+
+    {% if processed %}
+    <p class="govuk-body">This import has already been processed. Status: <strong class="govuk-tag">{{ batch.status.value }}</strong></p>
+    <p class="govuk-body"><a class="govuk-link" href="/imports/assets/new">Back to import</a></p>
+    {% else %}
+
+    <p class="govuk-body">{{ row_count }} row(s): {{ error_count }} with errors, {{ warning_count }} with warnings, {{ duplicate_count }} duplicate(s) (skipped on confirm).</p>
+
+    {% if not can_confirm %}
+    <div class="govuk-error-summary" data-module="govuk-error-summary">
+      <div role="alert">
+        <h2 class="govuk-error-summary__title">There is a problem</h2>
+        <div class="govuk-error-summary__body">Fix the CSV and re-upload — a batch with any row error cannot be confirmed.</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <table class="govuk-table">
+      <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+          <th scope="col" class="govuk-table__header">Row</th>
+          <th scope="col" class="govuk-table__header">Label</th>
+          <th scope="col" class="govuk-table__header">Status</th>
+          <th scope="col" class="govuk-table__header">Messages</th>
+          <th scope="col" class="govuk-table__header">Security measures matched</th>
+          <th scope="col" class="govuk-table__header">Security measures to propose</th>
+        </tr>
+      </thead>
+      <tbody class="govuk-table__body">
+        {% for report in reports %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ report.index }}</td>
+          <td class="govuk-table__cell">{{ report.values.label }}</td>
+          <td class="govuk-table__cell">
+            {% if report.errors %}
+            <strong class="govuk-tag govuk-tag--red">Error</strong>
+            {% elif report.is_duplicate %}
+            <strong class="govuk-tag govuk-tag--grey">Duplicate</strong>
+            {% elif report.warnings %}
+            <strong class="govuk-tag govuk-tag--yellow">Warning</strong>
+            {% else %}
+            <strong class="govuk-tag govuk-tag--green">OK</strong>
+            {% endif %}
+          </td>
+          <td class="govuk-table__cell">
+            {% for message in report.errors %}<p class="govuk-body-s govuk-!-margin-bottom-1">{{ message }}</p>{% endfor %}
+            {% for message in report.warnings %}<p class="govuk-body-s govuk-!-margin-bottom-1">{{ message }}</p>{% endfor %}
+          </td>
+          <td class="govuk-table__cell">{{ report.security_measure_matches | map(attribute=1) | join(", ") }}</td>
+          <td class="govuk-table__cell">{{ report.security_measure_proposals | join(", ") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if can_confirm %}
+    <form method="post" action="/imports/assets/{{ batch.id }}/confirm" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="govuk-button" data-module="govuk-button">Confirm import</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/imports/assets/{{ batch.id }}/cancel" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="govuk-button govuk-button--secondary" data-module="govuk-button">Cancel import</button>
+    </form>
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

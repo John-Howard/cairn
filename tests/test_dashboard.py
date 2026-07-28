@@ -189,6 +189,43 @@ def test_dashboard_export_coverage(activities_client, activities_web_engine):
     assert '/register/export/combined">Download CSV</a>' in response.text
 
 
+def test_dashboard_iar_export_row(activities_client, activities_web_engine):
+    _seed_dashboard_activities(activities_web_engine)
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Information Asset Register" in response.text
+    assert '/assets/export.csv">Download CSV</a>' in response.text
+
+
+def test_dashboard_asset_kpis(activities_client, activities_web_engine):
+    from cairn.models import InformationAsset
+
+    with Session(activities_web_engine) as db:
+        db.add_all(
+            [
+                InformationAsset(label="Case Management System", asset_type="system"),
+                InformationAsset(
+                    label="Paper Files",
+                    asset_type="paper",
+                    contains_personal_data=True,
+                ),
+                InformationAsset(
+                    label="Overdue Asset",
+                    asset_type="database",
+                    next_review_date=date.today() - timedelta(days=5),
+                ),
+            ]
+        )
+        db.commit()
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert '/assets?contains_personal_data=true">1</a>' in response.text
+    assert '/assets?review_overdue=true">1</a>' in response.text
+    assert "Assets without an Information Asset Owner" in response.text
+
+
 def test_dashboard_no_commencement_watch_card_without_data(
     activities_client, activities_web_engine
 ):

@@ -8,11 +8,18 @@ from cairn.models import (
     AuditEvent,
     EntryStatus,
     InformationAsset,
+    ProcessingActivity,
     RecordVersion,
     SecurityMeasure,
     SecurityMeasureCategory,
 )
-from test_activities import _create_activity, _extract_csrf, _login, _user_id
+from test_activities import (
+    _business_function_id,
+    _create_activity,
+    _extract_csrf,
+    _login,
+    _user_id,
+)
 
 
 def _asset_token(client) -> str:
@@ -313,3 +320,162 @@ def test_security_measure_junction_syncs_into_linked_activities(
             )
         ).all()
         assert remaining == []
+
+
+def test_document_processing_creates_linked_draft_with_inherited_security(
+    activities_client, activities_web_engine
+):
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Case System",
+        business_function_id=prevention_id,
+    )
+    with Session(activities_web_engine) as db:
+        measure = SecurityMeasure(
+            label="disk encryption", category=SecurityMeasureCategory.TECHNICAL
+        )
+        db.add(measure)
+        db.commit()
+        measure_id = measure.id
+    add_token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    activities_client.post(
+        f"/assets/{asset_id}/security-measures",
+        data={"csrf_token": add_token, "item_id": measure_id},
+    )
+
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 302
+    activity_id = response.headers["location"].removeprefix("/activities/")
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.record_status.value == "draft"
+        assert asset_id in {a.id for a in activity.assets}
+        link = db.scalars(
+            select(ActivitySecurity).where(
+                ActivitySecurity.activity_id == activity_id,
+                ActivitySecurity.security_measure_id == measure_id,
+            )
+        ).one()
+        assert link.inherited_from_system is True
+
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_id == activity_id,
+                AuditEvent.event == "activity_created_from_asset",
+            )
+        ).all()
+        assert len(events) == 1
+
+
+def test_document_processing_copies_business_function_from_asset(
+    activities_client, activities_web_engine
+):
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Functional Asset",
+        business_function_id=prevention_id,
+    )
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 302
+    activity_id = response.headers["location"].removeprefix("/activities/")
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.business_function_id == prevention_id
+
+
+def test_document_processing_422_for_proposed_asset(activities_client, activities_web_engine):
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cody Contributor",
+        label="Still Proposed",
+    )
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 422
+
+
+def test_document_processing_403_for_viewer(activities_client, activities_web_engine):
+    asset_id = _create_asset(
+        activities_client, activities_web_engine, login_as="Cara Curator", label="Viewer Blocked"
+    )
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 403
+
+
+def test_document_processing_403_for_contributor_wrong_function(
+    activities_client, activities_web_engine
+):
+    protection_id = _business_function_id(
+        activities_web_engine, "Protection (Fire Safety Regulation & Enforcement)"
+    )
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Protection Asset",
+        business_function_id=protection_id,
+    )
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 403
+
+
+def test_export_csv_content_filters_and_audit_event(activities_client, activities_web_engine):
+    _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Exportable System",
+        asset_type="system",
+    )
+    _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Exportable Paper",
+        asset_type="paper",
+    )
+
+    all_export = activities_client.get("/assets/export.csv")
+    assert all_export.status_code == 200
+    assert "text/csv" in all_export.headers["content-type"]
+    assert "Exportable System" in all_export.text
+    assert "Exportable Paper" in all_export.text
+
+    filtered_export = activities_client.get("/assets/export.csv", params={"asset_type": "system"})
+    assert "Exportable System" in filtered_export.text
+    assert "Exportable Paper" not in filtered_export.text
+
+    with Session(activities_web_engine) as db:
+        events = db.scalars(
+            select(AuditEvent).where(AuditEvent.event == "iar_exported")
+        ).all()
+        assert len(events) == 2

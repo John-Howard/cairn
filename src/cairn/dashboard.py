@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from cairn.activities import RECORD_STATUS_LABELS, REGIME_LABELS
@@ -12,16 +12,19 @@ from cairn.complaints import complaint_status
 from cairn.db import get_session
 from cairn.export import EXPORT_VIEWS, build_export_context, export_views, render_csv
 from cairn.models import (
+    AssetType,
     BusinessFunction,
     ComplaintRecord,
+    InformationAsset,
     LifecycleStage,
     OrganisationProfile,
     ProcessingActivity,
     RecordStatus,
     Regime,
     User,
+    activity_asset,
 )
-from cairn.rules import Severity, evaluate
+from cairn.rules import Severity, evaluate, evaluate_asset
 from cairn.templating import templates
 from cairn.vocabularies import pending_proposals_count
 
@@ -42,6 +45,38 @@ def _function_labels(session: Session) -> dict[str, str]:
     return {
         f.id: f.label
         for f in session.scalars(select(BusinessFunction).order_by(BusinessFunction.label)).all()
+    }
+
+
+def _asset_kpis(session: Session, today: date) -> dict:
+    assets = session.scalars(select(InformationAsset)).all()
+    type_counts = {t: 0 for t in AssetType}
+    for asset in assets:
+        type_counts[asset.asset_type] += 1
+    linked_counts = dict(
+        session.execute(
+            select(activity_asset.c.asset_id, func.count(activity_asset.c.activity_id)).group_by(
+                activity_asset.c.asset_id
+            )
+        ).all()
+    )
+    undocumented = sum(
+        1 for asset in assets if evaluate_asset(asset, linked_counts.get(asset.id, 0)) is not None
+    )
+    without_iao = sum(1 for asset in assets if asset.iao_user_id is None)
+    review_overdue = sum(
+        1
+        for asset in assets
+        if asset.next_review_date is not None and asset.next_review_date < today
+    )
+    return {
+        "total_assets": len(assets),
+        "asset_type_counts": [
+            (t.value.replace("_", " ").capitalize(), count) for t, count in type_counts.items()
+        ],
+        "assets_undocumented_count": undocumented,
+        "assets_without_iao_count": without_iao,
+        "assets_review_overdue_count": review_overdue,
     }
 
 
@@ -163,6 +198,7 @@ def dashboard(
             "complaints_attention": complaints_attention,
             "commencement_watch": commencement_watch,
             "csrf_token": get_csrf_token(request),
+            **_asset_kpis(session, today),
         },
     )
 

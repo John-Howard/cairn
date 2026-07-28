@@ -5,8 +5,15 @@
   <div class="govuk-grid-column-two-thirds">
     <h1 class="govuk-heading-l">Import information assets</h1>
     <p class="govuk-body">Bulk load an asset inventory or CMDB extract: upload a mapped CSV and each row becomes an approved information asset. You'll see a preview with any row errors before anything is created.</p>
-    <p class="govuk-body"><a class="govuk-link" href="/static/iar-import-template.csv">Download the CSV template</a></p>
-    <p class="govuk-body">Required columns: <code>label</code> and <code>asset_type</code>. Dates may be entered as YYYY-MM-DD or DD/MM/YYYY. <code>security_measures</code> is semicolon-separated. The template's example rows are prefixed "EXAMPLE:" — delete them before uploading.</p>
+    <p class="govuk-body"><a class="govuk-link" href="/static/iar-import-template.csv">Download the CSV template</a> — it has every column in the right order, with example rows showing the expected values.</p>
+    <p class="govuk-body">Before uploading, check that:</p>
+    <ul class="govuk-list govuk-list--bullet">
+      <li>the template's example rows are deleted (their labels start with “EXAMPLE:”)</li>
+      <li>every row has a <code>label</code> and an <code>asset_type</code> — all other columns are optional</li>
+      <li>dates are in <code>YYYY-MM-DD</code> or <code>DD/MM/YYYY</code> format</li>
+      <li>multiple <code>security_measures</code> are separated with semicolons</li>
+    </ul>
+    <p class="govuk-body">The full list of columns and accepted values is in the <a class="govuk-link" href="#csv-contract">CSV contract</a> below.</p>
 
     {% if error %}
     <div class="govuk-error-summary" data-module="govuk-error-summary">
@@ -26,7 +33,7 @@
       <button type="submit" class="govuk-button" data-module="govuk-button">Upload and preview</button>
     </form>
 
-    <h2 class="govuk-heading-m">CSV contract</h2>
+    <h2 class="govuk-heading-m" id="csv-contract">CSV contract</h2>
     <table class="govuk-table">
       <thead class="govuk-table__head">
         <tr class="govuk-table__row">

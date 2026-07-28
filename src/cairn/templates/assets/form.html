@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import error_summary, text_input, select, checkbox, textarea, date_input %}
+{% from "macros.html" import error_summary, text_input, select, checkbox, checkboxes, textarea, date_input %}
 {% block title %}{{ "Edit asset" if is_edit else "Add asset" }}{% endblock %}
 {% block content %}
 <h1 class="govuk-heading-l">{{ "Edit asset" if is_edit else "Add asset" }}</h1>
@@ -21,6 +21,10 @@
       {{ date_input(field.name, field.label, field.value, error=field.error) }}
     {% else %}
       {{ text_input(field.name, field.label, field.value, error=field.error) }}
+    {% endif %}
+    {% if field.name == "custodian" %}
+      {{ checkboxes("business_functions", "Business functions", business_function_options, checked=business_functions) }}
+      {% if business_functions_error %}<p class="govuk-error-message">{{ business_functions_error }}</p>{% endif %}
     {% endif %}
   {% endfor %}
 

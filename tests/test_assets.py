@@ -34,7 +34,7 @@ def _minimal_asset_data(csrf_token: str, **overrides) -> dict:
         "description": "",
         "iao_user_id": "",
         "custodian": "",
-        "business_function_id": "",
+        "business_functions": [],
         "classification": "not_classified",
         "status": "in_use",
         "next_review_date": "",
@@ -106,6 +106,79 @@ def test_register_filters_by_type_personal_data_overdue_and_mine(
     assert "Paper Files" not in mine.text
 
 
+def test_register_filter_by_business_function_is_any_match(
+    activities_client, activities_web_engine
+):
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    protection_id = _business_function_id(
+        activities_web_engine, "Protection (Fire Safety Regulation & Enforcement)"
+    )
+    hr_id = _business_function_id(activities_web_engine, "HR")
+    _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Dual Function Asset",
+        business_functions=[prevention_id, protection_id],
+    )
+    _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="HR Only Asset",
+        business_functions=[hr_id],
+    )
+
+    under_prevention = activities_client.get(
+        "/assets", params={"business_function_id": prevention_id}
+    )
+    assert "Dual Function Asset" in under_prevention.text
+    assert "HR Only Asset" not in under_prevention.text
+
+    under_protection = activities_client.get(
+        "/assets", params={"business_function_id": protection_id}
+    )
+    assert "Dual Function Asset" in under_protection.text
+    assert "HR Only Asset" not in under_protection.text
+
+    under_hr = activities_client.get("/assets", params={"business_function_id": hr_id})
+    assert "HR Only Asset" in under_hr.text
+    assert "Dual Function Asset" not in under_hr.text
+
+
+def test_detail_and_export_show_joined_business_function_labels(
+    activities_client, activities_web_engine
+):
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    protection_id = _business_function_id(
+        activities_web_engine, "Protection (Fire Safety Regulation & Enforcement)"
+    )
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Joined Label Asset",
+        business_functions=[prevention_id, protection_id],
+    )
+
+    detail = activities_client.get(f"/assets/{asset_id}")
+    assert (
+        "Prevention &amp; Community Safety; Protection (Fire Safety Regulation &amp; Enforcement)"
+        in detail.text
+    )
+
+    export = activities_client.get("/assets/export.csv")
+    assert "Business functions" in export.text
+    assert (
+        "Prevention & Community Safety; Protection (Fire Safety Regulation & Enforcement)"
+        in export.text
+    )
+
+
 def test_curator_create_is_approved(activities_client, activities_web_engine):
     asset_id = _create_asset(
         activities_client, activities_web_engine, login_as="Cara Curator", label="Curator Asset"
@@ -113,6 +186,36 @@ def test_curator_create_is_approved(activities_client, activities_web_engine):
     with Session(activities_web_engine) as db:
         asset = db.get(InformationAsset, asset_id)
         assert asset.entry_status == EntryStatus.APPROVED
+
+
+def _checkbox_is_checked(html: str, name: str, value: str) -> bool:
+    marker = f'id="{name}-{value}"'
+    start = html.index(marker)
+    end = html.index(">", start)
+    return "checked" in html[start:end]
+
+
+def test_create_with_two_business_functions_via_form(activities_client, activities_web_engine):
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    protection_id = _business_function_id(
+        activities_web_engine, "Protection (Fire Safety Regulation & Enforcement)"
+    )
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Multi-Function Asset",
+        business_functions=[prevention_id, protection_id],
+    )
+    with Session(activities_web_engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        assert {bf.id for bf in asset.business_functions} == {prevention_id, protection_id}
+
+    edit_page = activities_client.get(f"/assets/{asset_id}/edit")
+    assert _checkbox_is_checked(edit_page.text, "business_functions", prevention_id)
+    assert _checkbox_is_checked(edit_page.text, "business_functions", protection_id)
 
 
 def test_contributor_create_is_proposed(activities_client, activities_web_engine):
@@ -333,7 +436,7 @@ def test_document_processing_creates_linked_draft_with_inherited_security(
         activities_web_engine,
         login_as="Cara Curator",
         label="Case System",
-        business_function_id=prevention_id,
+        business_functions=[prevention_id],
     )
     with Session(activities_web_engine) as db:
         measure = SecurityMeasure(
@@ -387,7 +490,7 @@ def test_document_processing_copies_business_function_from_asset(
         activities_web_engine,
         login_as="Cara Curator",
         label="Functional Asset",
-        business_function_id=prevention_id,
+        business_functions=[prevention_id],
     )
     token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
     response = activities_client.post(
@@ -399,6 +502,48 @@ def test_document_processing_copies_business_function_from_asset(
     with Session(activities_web_engine) as db:
         activity = db.get(ProcessingActivity, activity_id)
         assert activity.business_function_id == prevention_id
+
+
+def test_document_processing_falls_back_to_users_function_when_asset_has_several(
+    activities_client, activities_web_engine
+):
+    prevention_id = _business_function_id(
+        activities_web_engine, "Prevention & Community Safety"
+    )
+    protection_id = _business_function_id(
+        activities_web_engine, "Protection (Fire Safety Regulation & Enforcement)"
+    )
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cara Curator",
+        label="Multi Function Asset",
+        business_functions=[prevention_id, protection_id],
+    )
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 302
+    activity_id = response.headers["location"].removeprefix("/activities/")
+
+    with Session(activities_web_engine) as db:
+        activity = db.get(ProcessingActivity, activity_id)
+        assert activity.business_function_id == prevention_id
+
+
+def test_document_processing_422_when_asset_and_user_have_no_function(
+    activities_client, activities_web_engine
+):
+    asset_id = _create_asset(
+        activities_client, activities_web_engine, login_as="Cara Curator", label="No Function Asset"
+    )
+    token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/document-processing", data={"csrf_token": token}
+    )
+    assert response.status_code == 422
 
 
 def test_document_processing_422_for_proposed_asset(activities_client, activities_web_engine):
@@ -438,7 +583,7 @@ def test_document_processing_403_for_contributor_wrong_function(
         activities_web_engine,
         login_as="Cara Curator",
         label="Protection Asset",
-        business_function_id=protection_id,
+        business_functions=[protection_id],
     )
     _login(activities_client, activities_web_engine, "Cody Contributor")
     token = _extract_csrf(activities_client.get(f"/assets/{asset_id}").text)

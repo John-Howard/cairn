@@ -91,6 +91,7 @@ from cairn.models.vocab import (
     SpecialCategoryCondition,
     ThirdCountry,
     TransferMechanism,
+    asset_businessfunction,
     asset_securitymeasure,
     externaldatasource_datacategory,
 )
@@ -187,6 +188,7 @@ __all__ = [
     "activity_privacynotice",
     "activity_recipient",
     "adm_datasource",
+    "asset_businessfunction",
     "asset_securitymeasure",
     "contract_party",
     "externaldatasource_datacategory",

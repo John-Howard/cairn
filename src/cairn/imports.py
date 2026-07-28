@@ -521,15 +521,14 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
             values["iao_user_id"] = None
 
         function_raw = (row.get("business_function") or "").strip()
-        if function_raw:
-            bf = business_functions.get(function_raw.lower())
+        function_ids: list[str] = []
+        for token_name in _split_names(function_raw):
+            bf = business_functions.get(token_name.lower())
             if bf is None:
-                warnings.append(f"Unknown business function: '{function_raw}' — leaving unset")
-                values["business_function_id"] = None
+                warnings.append(f"Unknown business function: '{token_name}' — skipped")
             else:
-                values["business_function_id"] = bf.id
-        else:
-            values["business_function_id"] = None
+                function_ids.append(bf.id)
+        values["business_function_ids"] = function_ids
 
         classification_raw = (row.get("classification") or "").strip()
         if classification_raw:
@@ -652,7 +651,6 @@ def apply_asset_batch(
             "description",
             "iao_user_id",
             "custodian",
-            "business_function_id",
             "classification",
             "contains_personal_data",
             "status",
@@ -668,6 +666,9 @@ def apply_asset_batch(
         asset.entry_status = EntryStatus.APPROVED
         session.add(asset)
         session.flush()
+        for bf_id in values["business_function_ids"]:
+            bf = session.get(BusinessFunction, bf_id)
+            asset.business_functions.append(bf)
         for entry_id, _label in report.security_measure_matches:
             measure = session.get(SecurityMeasure, entry_id)
             asset.security_measures.append(measure)

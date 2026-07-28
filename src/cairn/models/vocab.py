@@ -126,6 +126,13 @@ asset_securitymeasure = Table(
     Column("security_measure_id", ForeignKey("security_measure.id"), primary_key=True),
 )
 
+asset_businessfunction = Table(
+    "asset_businessfunction",
+    Base.metadata,
+    Column("asset_id", ForeignKey("information_asset.id"), primary_key=True),
+    Column("business_function_id", ForeignKey("business_function.id"), primary_key=True),
+)
+
 
 class InformationAsset(ProposableMixin, AuditedBase):
     __tablename__ = "information_asset"
@@ -135,7 +142,6 @@ class InformationAsset(ProposableMixin, AuditedBase):
     description: Mapped[str | None] = mapped_column(Text)
     iao_user_id: Mapped[str | None] = mapped_column(ForeignKey("user.id"))
     custodian: Mapped[str | None]
-    business_function_id: Mapped[str | None] = mapped_column(ForeignKey("business_function.id"))
     classification: Mapped[SecurityClassification] = mapped_column(
         default=SecurityClassification.NOT_CLASSIFIED
     )
@@ -152,6 +158,9 @@ class InformationAsset(ProposableMixin, AuditedBase):
 
     security_measures: Mapped[list[SecurityMeasure]] = relationship(
         secondary=asset_securitymeasure
+    )
+    business_functions: Mapped[list[BusinessFunction]] = relationship(
+        secondary=asset_businessfunction
     )
 
 

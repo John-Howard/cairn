@@ -40,6 +40,7 @@ The intake tables currently assume a single question set. Changes, in one forwar
 - **Routes:** `/intake/assets` namespace (start → sections → review → submit), sharing the wizard engine (rendering, `depends_on` evaluation, don't-know handling, answer normalisation) with the activity wizard; the engine is parameterised by question set, not duplicated.
 - **Start screen** mirrors activity intake: department (business function), respondent, and the asset's name (→ `label`).
 - **Populates handlers** — a second registry mapping the §4 codes onto `InformationAsset` fields. Notable mappings:
+  - *Business functions are multi-valued* (requirement recorded 2026-07-28, `asset_businessfunction` junction): the respondent's department from the start screen becomes the asset's first business function, and AS-B3 ("which other teams use it?") adds further label-matched functions — unmatched names land in `notes` with a gap.
   - *IAO named in answers is text, not an account pick.* Respondents rarely know user emails; the named person lands in `notes` ("Named senior owner: …") plus a gap, and the curator binds `iao_user_id` on approval. Deny-by-default account linking is preserved.
   - *Supplier and retention answers match by label* (case-insensitive) against Legal Entity / Retention Rule; unmatched values are recorded in `notes` with a gap — neither vocabulary is auto-proposable from a bare name (same rule as the CSV import).
   - *Security measures* use the existing `VOCAB_MULTI` kind against the security-measure vocabulary, proposing unmatched entries.
@@ -79,6 +80,7 @@ To be extracted, on sign-off, into its own document (*Cairn IAR Question Set v0.
 | AS-A3 | A | Is it still in everyday use? | Still used · being phased out or replaced · no longer used at all | single_choice | `status` |
 | AS-B1 | B — Who looks after it | Who looks after it day to day? | A person or team, e.g. "HR admin team" | text | `custodian` |
 | AS-B2 | B | Who is the senior person responsible for it? | The person who would decide if it changed or was got rid of — its owner | text | `notes` + gap → curator binds `iao_user_id` |
+| AS-B3 | B | Do any other teams or departments use or rely on it? Which ones? | Your own department is already recorded — list any others | text | `business_functions` (label match; unmatched → `notes` + gap) |
 | AS-C1 | C — The information it holds | Does it hold information about people? | Staff, the public, anyone — however routine | yes_no | `contains_personal_data` |
 | AS-C2 | C *(if C1 = yes)* | Roughly what information about people does it hold? | Names and contact details? Health information? Photographs or recordings? | textarea | `notes` (curation context) |
 | AS-D1 | D — Where it is | Where is it kept? | A building or room for paper; a supplier, data centre or "the cloud" for systems | text | `location` |

@@ -1,6 +1,6 @@
 # Cairn — System Administration Reference
 
-**Status:** Admin Reference v0.2. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
+**Status:** Admin Reference v0.3. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
 
 ---
 
@@ -126,6 +126,7 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 | Health / liveness | `GET /healthz` (no auth) — status, DB reachability and running version; 503 `degraded` when the database is unreachable |
 | User admin | `/users` (approver_dpo only): create, edit roles/functions, deactivate/reactivate. Users are **deactivated, never deleted** (NFRs) — deactivation blocks login, ends live sessions and removes them from pickers |
 | Locked out / no approver | If the only approver is deactivated by DB mishap: set `is_active` back to true directly in the database (`UPDATE "user" SET is_active = true WHERE id = …`) — the app deliberately prevents self-deactivation to avoid this |
+| Information Asset Register bulk load | `/imports/assets/new` (curator/approver): download the Excel-ready template (`/static/iar-import-template.csv` — delete its `EXAMPLE:` rows), fill, upload → preview → confirm. Duplicate labels are skipped, unmatched IAO emails/business functions become row warnings, any error row blocks the batch, and each confirmed batch writes one audit event. Dates accept `YYYY-MM-DD` or `DD/MM/YYYY` |
 | Backups | Daily `pg_dump` / managed-service backup; 35 days rolling + 12 monthly (NFRs §4). SQLite dev DB is disposable, never backed up |
 | Restore test | Quarterly: restore latest backup into the compose stack, run the pytest smoke suite and a manual register export, record the result (`environments-devops.md` §4) |
 | Disaster recovery | Redeploy the image on any estate + restore the latest backup; RTO ≤ 1 business day, RPO ≤ 24h |
@@ -139,4 +140,4 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 
 ---
 
-*Admin Reference v0.2 (adds §5 SSO/OIDC setup) — update this document whenever the start/stop/deploy mechanics change (new auth mode, entrypoint migrations, logging).*
+*Admin Reference v0.3 (adds the IAR bulk-load reference to §6; v0.2 added §5 SSO/OIDC setup) — update this document whenever the start/stop/deploy mechanics change (new auth mode, entrypoint migrations, logging).*

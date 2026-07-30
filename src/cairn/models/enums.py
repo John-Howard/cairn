@@ -229,6 +229,11 @@ class IntakeStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class IntakeQuestionSet(StrEnum):
+    ACTIVITY = "activity"
+    ASSET = "asset"
+
+
 class AssetType(StrEnum):
     SYSTEM = "system"
     DATABASE = "database"

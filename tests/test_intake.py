@@ -9,8 +9,10 @@ from cairn.models import (
     EntryStatus,
     ExternalDataUseMode,
     InformationAsset,
+    IntakeAnswerKind,
     IntakeGap,
     IntakeQuestion,
+    IntakeQuestionSet,
     IntakeStatus,
     IntakeSubmission,
     LifecycleStage,
@@ -20,6 +22,7 @@ from cairn.models import (
     RecordStatus,
     Regime,
 )
+from conftest import business_function
 from test_activities import _extract_csrf, _login
 
 PREVENTION = "Prevention & Community Safety"
@@ -35,14 +38,12 @@ def _page_csrf(client, url: str) -> str:
 def _start(client, engine, *, name="Home fire safety visits", function=PREVENTION) -> str:
     token = _page_csrf(client, "/intake/new")
     with Session(engine) as db:
-        from conftest import business_function
-
         function_id = business_function(db, function).id
     response = client.post(
         "/intake",
         data={
             "csrf_token": token,
-            "activity_name": name,
+            "subject_name": name,
             "business_function_id": function_id,
             "respondent_contact": "Jo Bloggs, watch manager, jo@example.org",
         },
@@ -80,6 +81,69 @@ def test_questions_seeded(session):
     assert {"B3", "C1", "D1", "E2", "F3", "G1", "H1", "K2"} <= codes
     k = session.scalars(select(IntakeQuestion).where(IntakeQuestion.section == "K")).all()
     assert k and all(q.enforcement_only for q in k)
+
+
+def test_activity_questions_default_to_activity_question_set(session):
+    questions = session.scalars(select(IntakeQuestion)).all()
+    assert questions
+    assert all(q.question_set == IntakeQuestionSet.ACTIVITY for q in questions)
+
+
+def test_submission_subject_name_and_question_set_default(session, actor):
+    submission = IntakeSubmission(
+        subject_name="Home fire safety visits",
+        business_function_id=business_function(session, PREVENTION).id,
+        respondent_id=actor.id,
+        answers={},
+    )
+    session.add(submission)
+    session.flush()
+    assert submission.subject_name == "Home fire safety visits"
+    assert submission.question_set == IntakeQuestionSet.ACTIVITY
+    assert submission.asset_id is None
+
+
+def test_submission_asset_id_settable(session, actor):
+    asset = InformationAsset(label="HR system", asset_type=AssetType.SYSTEM)
+    session.add(asset)
+    session.flush()
+    submission = IntakeSubmission(
+        subject_name="HR system",
+        business_function_id=business_function(session, PREVENTION).id,
+        respondent_id=actor.id,
+        answers={},
+        question_set=IntakeQuestionSet.ASSET,
+        asset_id=asset.id,
+    )
+    session.add(submission)
+    session.flush()
+    assert submission.asset_id == asset.id
+    assert submission.question_set == IntakeQuestionSet.ASSET
+
+
+def test_gap_asset_id_nullable_and_settable(session, actor):
+    asset = InformationAsset(label="Payroll system", asset_type=AssetType.SYSTEM)
+    session.add(asset)
+    session.flush()
+    submission = IntakeSubmission(
+        subject_name="Payroll system",
+        business_function_id=business_function(session, PREVENTION).id,
+        respondent_id=actor.id,
+        answers={},
+    )
+    session.add(submission)
+    session.flush()
+    gap = IntakeGap(
+        submission_id=submission.id,
+        question_code="AS-B2",
+        question_text="Who is the senior person responsible for it?",
+    )
+    session.add(gap)
+    session.flush()
+    assert gap.asset_id is None
+    gap.asset_id = asset.id
+    session.flush()
+    assert gap.asset_id == asset.id
 
 
 def test_viewer_cannot_use_intake(activities_client, activities_web_engine):
@@ -244,14 +308,12 @@ def test_contributor_locked_to_own_function_and_own_submissions(
     _login(client, engine, "Cody Contributor")
     token = _page_csrf(client, "/intake/new")
     with Session(engine) as db:
-        from conftest import business_function
-
         protection_id = business_function(db, PROTECTION).id
     response = client.post(
         "/intake",
         data={
             "csrf_token": token,
-            "activity_name": "Sneaky cross-function intake",
+            "subject_name": "Sneaky cross-function intake",
             "business_function_id": protection_id,
         },
     )
@@ -589,3 +651,40 @@ def test_review_shows_not_applicable_for_unasked_questions(
     _save_section(client, submission_id, "B", {"B3": "no"})
     page = client.get(f"/intake/{submission_id}/review").text
     assert "Not applicable" in page
+
+
+def test_seed_activity_questions_is_idempotent(session):
+    from cairn.seeds.intake import seed_activity_questions
+
+    before = session.scalars(
+        select(IntakeQuestion.code).where(IntakeQuestion.question_set == IntakeQuestionSet.ACTIVITY)
+    ).all()
+    seed_activity_questions(session)
+    after = session.scalars(
+        select(IntakeQuestion.code).where(IntakeQuestion.question_set == IntakeQuestionSet.ACTIVITY)
+    ).all()
+    assert sorted(before) == sorted(after)
+
+
+def test_seed_question_set_not_blocked_by_other_populated_set(session):
+    from cairn.seeds.intake import seed_question_set
+
+    assert session.scalars(
+        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ACTIVITY)
+    ).first() is not None
+
+    minimal = [
+        ("AS-TEST1", "A", "What it is", "Which of these best describes it?", None,
+         IntakeAnswerKind.TEXT, None, None, False),
+    ]
+    seed_question_set(session, IntakeQuestionSet.ASSET, minimal, {})
+    asset_questions = session.scalars(
+        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ASSET)
+    ).all()
+    assert [q.code for q in asset_questions] == ["AS-TEST1"]
+
+    seed_question_set(session, IntakeQuestionSet.ASSET, minimal, {})
+    asset_questions_again = session.scalars(
+        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ASSET)
+    ).all()
+    assert [q.code for q in asset_questions_again] == ["AS-TEST1"]

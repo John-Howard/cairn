@@ -115,7 +115,7 @@ SECURITY_MEASURES = [
 
 
 def seed_frs_pack(session: Session) -> None:
-    from cairn.seeds.intake import seed_intake_questions
+    from cairn.seeds.intake import seed_activity_questions
 
     for label in BUSINESS_FUNCTIONS:
         session.add(BusinessFunction(label=label))
@@ -131,5 +131,5 @@ def seed_frs_pack(session: Session) -> None:
         session.add(Recipient(label=label, type=type_))
     for label, category in SECURITY_MEASURES:
         session.add(SecurityMeasure(label=label, category=category))
-    seed_intake_questions(session)
+    seed_activity_questions(session)
     session.flush()

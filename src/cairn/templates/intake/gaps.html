@@ -14,7 +14,7 @@
 {% set s = group.submission %}
 <div class="govuk-summary-card">
   <div class="govuk-summary-card__title-wrapper">
-    <h2 class="govuk-summary-card__title">{{ s.activity_name }} — {{ s.business_function.label }}</h2>
+    <h2 class="govuk-summary-card__title">{{ s.subject_name }} — {{ s.business_function.label }}</h2>
     <ul class="govuk-summary-card__actions">
       <li class="govuk-summary-card__action"><a class="govuk-link" href="/intake/{{ s.id }}">Intake answers</a></li>
       {% if s.activity_id %}
@@ -55,7 +55,7 @@
   <tbody class="govuk-table__body">
     {% for gap in resolved %}
     <tr class="govuk-table__row">
-      <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ gap.submission_id }}">{{ gap.submission.activity_name }}</a></td>
+      <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ gap.submission_id }}">{{ gap.submission.subject_name }}</a></td>
       <td class="govuk-table__cell">{{ gap.question_code }} — {{ gap.question_text }}</td>
       <td class="govuk-table__cell">{{ gap.resolution_note }}</td>
       <td class="govuk-table__cell">

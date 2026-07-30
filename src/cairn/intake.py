@@ -32,6 +32,7 @@ from cairn.models import (
     InformationAsset,
     IntakeGap,
     IntakeQuestion,
+    IntakeQuestionSet,
     IntakeStatus,
     IntakeSubmission,
     LifecycleStage,
@@ -103,8 +104,14 @@ def sections_for(submission: IntakeSubmission) -> list[str]:
     return [s for s in SECTION_ORDER if s != "K"]
 
 
-def _questions(session: Session, section: str | None = None) -> list[IntakeQuestion]:
-    stmt = select(IntakeQuestion).where(IntakeQuestion.is_active)
+def _questions(
+    session: Session,
+    section: str | None = None,
+    question_set: IntakeQuestionSet = IntakeQuestionSet.ACTIVITY,
+) -> list[IntakeQuestion]:
+    stmt = select(IntakeQuestion).where(
+        IntakeQuestion.is_active, IntakeQuestion.question_set == question_set
+    )
     if section is not None:
         stmt = stmt.where(IntakeQuestion.section == section)
     return list(session.scalars(stmt.order_by(IntakeQuestion.order)))
@@ -302,7 +309,7 @@ def apply_submission(
         use_mode = ExternalDataUseMode.MANUAL
 
     activity = ProcessingActivity(
-        name=submission.activity_name,
+        name=submission.subject_name,
         business_function_id=submission.business_function_id,
         purpose=purpose,
         controller_or_processor=role,
@@ -455,12 +462,12 @@ async def intake_start(
 ):
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
-    activity_name = (form.get("activity_name") or "").strip()
+    subject_name = (form.get("subject_name") or "").strip()
     function_id = form.get("business_function_id")
     if user.role == Role.CONTRIBUTOR and user.business_function_id:
         function_id = user.business_function_id
     function = session.get(BusinessFunction, function_id) if function_id else None
-    if not activity_name or function is None:
+    if not subject_name or function is None:
         functions = session.scalars(
             select(BusinessFunction).order_by(BusinessFunction.label)
         ).all()
@@ -476,7 +483,8 @@ async def intake_start(
             status_code=422,
         )
     submission = IntakeSubmission(
-        activity_name=activity_name,
+        subject_name=subject_name,
+        question_set=IntakeQuestionSet.ACTIVITY,
         business_function_id=function.id,
         respondent_id=user.id,
         respondent_contact=(form.get("respondent_contact") or "").strip() or None,

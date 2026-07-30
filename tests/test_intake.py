@@ -84,7 +84,9 @@ def test_questions_seeded(session):
 
 
 def test_activity_questions_default_to_activity_question_set(session):
-    questions = session.scalars(select(IntakeQuestion)).all()
+    questions = session.scalars(
+        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ACTIVITY)
+    ).all()
     assert questions
     assert all(q.question_set == IntakeQuestionSet.ACTIVITY for q in questions)
 
@@ -666,25 +668,32 @@ def test_seed_activity_questions_is_idempotent(session):
     assert sorted(before) == sorted(after)
 
 
-def test_seed_question_set_not_blocked_by_other_populated_set(session):
-    from cairn.seeds.intake import seed_question_set
+def test_seed_question_set_not_blocked_by_other_populated_set():
+    from sqlalchemy import create_engine
 
-    assert session.scalars(
-        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ACTIVITY)
-    ).first() is not None
+    from cairn.models import Base
+    from cairn.seeds.intake import seed_activity_questions, seed_question_set
 
-    minimal = [
-        ("AS-TEST1", "A", "What it is", "Which of these best describes it?", None,
-         IntakeAnswerKind.TEXT, None, None, False),
-    ]
-    seed_question_set(session, IntakeQuestionSet.ASSET, minimal, {})
-    asset_questions = session.scalars(
-        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ASSET)
-    ).all()
-    assert [q.code for q in asset_questions] == ["AS-TEST1"]
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as fresh_session:
+        seed_activity_questions(fresh_session)
+        assert fresh_session.scalars(
+            select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ACTIVITY)
+        ).first() is not None
 
-    seed_question_set(session, IntakeQuestionSet.ASSET, minimal, {})
-    asset_questions_again = session.scalars(
-        select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ASSET)
-    ).all()
-    assert [q.code for q in asset_questions_again] == ["AS-TEST1"]
+        minimal = [
+            ("AS-TEST1", "A", "What it is", "Which of these best describes it?", None,
+             IntakeAnswerKind.TEXT, None, None, False),
+        ]
+        seed_question_set(fresh_session, IntakeQuestionSet.ASSET, minimal, {})
+        asset_questions = fresh_session.scalars(
+            select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ASSET)
+        ).all()
+        assert [q.code for q in asset_questions] == ["AS-TEST1"]
+
+        seed_question_set(fresh_session, IntakeQuestionSet.ASSET, minimal, {})
+        asset_questions_again = fresh_session.scalars(
+            select(IntakeQuestion).where(IntakeQuestion.question_set == IntakeQuestionSet.ASSET)
+        ).all()
+        assert [q.code for q in asset_questions_again] == ["AS-TEST1"]

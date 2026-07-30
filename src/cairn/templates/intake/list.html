@@ -4,8 +4,9 @@
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-two-thirds">
     <h1 class="govuk-heading-l">Information audit intake</h1>
-    <p class="govuk-body">Record one intake per <strong>activity</strong> — each distinct thing your team does with information about people. A department will usually complete this several times. "Don't know" is a valid answer; the IG team will follow up.</p>
-    <a href="/intake/new" class="govuk-button" data-module="govuk-button">Start a new intake</a>
+    <p class="govuk-body">Record one intake per <strong>activity</strong> — each distinct thing your team does with information about people — or per <strong>information asset</strong> — a system, database or collection of records your team looks after. A department will usually complete each several times. "Don't know" is a valid answer; the IG team will follow up.</p>
+    <a href="/intake/new" class="govuk-button" data-module="govuk-button">Start an activity intake</a>
+    <a href="/intake/assets/new" class="govuk-button govuk-button--secondary" data-module="govuk-button">Start an asset intake</a>
     {% if user.role.value in ("curator", "approver_dpo") %}
     <p class="govuk-body"><a class="govuk-link" href="/intake/gaps">Work through open intake gaps</a></p>
     {% endif %}
@@ -16,7 +17,8 @@
 <table class="govuk-table">
   <thead class="govuk-table__head">
     <tr class="govuk-table__row">
-      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Type</th>
+      <th scope="col" class="govuk-table__header">Name</th>
       <th scope="col" class="govuk-table__header">Department</th>
       <th scope="col" class="govuk-table__header">Respondent</th>
       <th scope="col" class="govuk-table__header">Status</th>
@@ -27,6 +29,7 @@
   <tbody class="govuk-table__body">
     {% for s in submissions %}
     <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ "Asset" if s.question_set.value == "asset" else "Activity" }}</td>
       <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ s.id }}">{{ s.subject_name }}</a></td>
       <td class="govuk-table__cell">{{ s.business_function.label }}</td>
       <td class="govuk-table__cell">{{ s.respondent.display_name }}</td>
@@ -37,7 +40,9 @@
       </td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ open_gaps[s.id] }}</td>
       <td class="govuk-table__cell">
-        {% if s.activity_id %}<a class="govuk-link" href="/activities/{{ s.activity_id }}">Draft activity</a>{% else %}—{% endif %}
+        {% if s.activity_id %}<a class="govuk-link" href="/activities/{{ s.activity_id }}">Draft activity</a>
+        {% elif s.asset_id %}<a class="govuk-link" href="/assets/{{ s.asset_id }}">Proposed asset</a>
+        {% else %}—{% endif %}
       </td>
     </tr>
     {% endfor %}

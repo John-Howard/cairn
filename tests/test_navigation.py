@@ -123,3 +123,26 @@ def test_nav_active_item_marked(seeded_client, seeded_web_engine):
     response = seeded_client.get("/register")
     assert response.status_code == 200
     assert 'aria-current="true"' in response.text
+
+
+def test_add_page_links_both_bulk_imports_for_a_curator(
+    activities_client, activities_web_engine
+):
+    """Activities and assets have separate import pages. Linking only /imports
+    left asset bulk load unreachable from the menu, and described /imports as
+    doing something it cannot."""
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    response = activities_client.get("/add")
+    assert response.status_code == 200
+    assert 'href="/imports"' in response.text
+    assert 'href="/imports/assets/new"' in response.text
+
+
+def test_add_page_hides_both_bulk_imports_from_a_contributor(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    response = activities_client.get("/add")
+    assert response.status_code == 200
+    assert 'href="/imports"' not in response.text
+    assert 'href="/imports/assets/new"' not in response.text

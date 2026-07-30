@@ -22,9 +22,13 @@
     </dd>
   </div>
   {% if can_curate %}
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/imports">Import activities from a spreadsheet</a></dt>
+    <dd class="govuk-summary-list__value">Bulk or offline capture: each row of a mapped CSV becomes a draft processing activity, with a preview before anything is created.</dd>
+  </div>
   <div class="govuk-summary-list__row govuk-summary-list__row--no-border">
-    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/imports">Import a spreadsheet</a></dt>
-    <dd class="govuk-summary-list__value">Bulk-load activities from a questionnaire export, or assets from a CSV.</dd>
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/imports/assets/new">Import information assets from a spreadsheet</a></dt>
+    <dd class="govuk-summary-list__value">The same for the asset register — a downloadable CSV template gives every column in the right order. The natural first load for an existing ICT application list.</dd>
   </div>
   {% endif %}
 </dl>

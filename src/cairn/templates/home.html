@@ -11,6 +11,7 @@
   <a class="govuk-link govuk-!-margin-right-4" href="/vocabularies">Vocabularies</a>
   {% if user.role.value in ("contributor", "curator", "approver_dpo") %}
   <a class="govuk-link govuk-!-margin-right-4" href="/intake">Intake</a>
+  <a class="govuk-link govuk-!-margin-right-4" href="/intake/assets/new">Asset intake</a>
   {% endif %}
   {% if user.role.value in ("curator", "approver_dpo") %}
   <a class="govuk-link govuk-!-margin-right-4" href="/intake/gaps">Intake gaps</a>

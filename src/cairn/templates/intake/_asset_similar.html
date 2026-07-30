@@ -1,0 +1,13 @@
+{% if matches %}
+<div class="govuk-inset-text govuk-!-margin-top-2 govuk-!-margin-bottom-2">
+  <p class="govuk-body-s govuk-!-margin-bottom-1">Assets with similar names already exist. If one of these is what you mean, you don't need to add it again — carry on if not.</p>
+  <ul class="govuk-list govuk-!-margin-bottom-0">
+    {% for asset in matches %}
+    <li>
+      <a class="govuk-link" href="/assets/{{ asset.id }}" target="_blank" rel="noopener">{{ asset.label }}</a>
+      {% if asset.entry_status.value == "proposed" %}<span class="govuk-tag govuk-tag--blue govuk-!-margin-left-1">Proposed</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

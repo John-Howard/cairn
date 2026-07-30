@@ -56,6 +56,9 @@ Test suite 294 passing; CI green throughout. **Remaining work before go-live is 
 24. **Question Set v0.2** (planned): P5 retrospective output, folding in dry-run and pilot findings; becomes the periodic-review questionnaire (Plan §5). One candidate is already known: **merge C4/C5 into a single choice** ("our own activity / for another organisation / jointly with another organisation"), eliminating the processor-and-joint contradiction *structurally* rather than by validation (the conditional-logic slice rejects the combination with an error today, which works with v0.1 as signed off). A wording/structure change to signed content, so it takes the v0.2 route with IG sign-off — the `single_choice` kind, `depends_on` config and the C4/C5 apply mapping already support it, so the build cost is a seed edit, a data migration for the changed rows, and test updates.
 25. **IAR slice 2i — asset intake wizard** — **NEXT BUILD SLICE (marked 2026-07-28; plan: `Cairn-2i-asset-intake-plan.md`)** (IAR plan §5.3/§7, added 2026-07-27): the guided, jargon-free asset question set for asset owners, producing proposed assets and gap records. Prerequisite is the `question_set` discriminator (`activity` | `asset`) on the intake tables — the same generalisation that serves item 8 (question-set admin) and the reseed mechanics in item 7 — plus a new *Cairn IAR Question Set v0.1* document. 2g–2h already give the pilot its inventory step (CSV import of the ICT application list at P1), so 2i can build in parallel with early pilot stages.
 
+26. **No inline styles anywhere — CSP blocks them** (found 2026-07-30 during the 2i.2 live drive): the app sends `Content-Security-Policy: default-src 'self'` with no `style-src 'unsafe-inline'`, so a `style="…"` attribute reaches the DOM but computes to nothing. Verified against the asset detail page (`getComputedStyle` returned `normal` for an inline `white-space: pre-line`). Anything needing new styling must go in a stylesheet, and Cairn ships no app stylesheet of its own — only govuk-frontend. There is one dead inline style in the tree already (`base.html`, the sign-out form's `display:inline`). Decide at the point of need: add a small `cairn.css`, or extend the CSP.
+27. **Intake-derived asset notes read as a run-on block.** Asset intake appends several lines to `InformationAsset.notes` (unmatched teams, named senior owner, respondent's description of the data, unmatched supplier and retention). They are stored newline-separated but the summary-list renders them as one paragraph, because item 26 rules out the one-line fix. The better answer is structural and already planned: 2i.3's "created from intake" panel renders the submission's answers as their own rows, so the notes block stops carrying that load.
+
 ## 5. Standing assurance items (Phase 3, unchanged but restated)
 
 - **Penetration test** — now more urgent than when scoped: the attack surface grew (OIDC endpoints, intake forms).
@@ -73,7 +76,7 @@ Test suite 294 passing; CI green throughout. **Remaining work before go-live is 
 | At first staging deployment | 5 Entra round-trip verification *(2 done 2026-07-17)* |
 | During pilot (as evidence arrives) | 8–14 |
 | Before go-live | Phase 3 items (§5) · 15 notifications |
-| Post go-live / roadmap | 16–24 |
+| Post go-live / roadmap | 16–24 · 26 (decide at point of need) |
 
 ---
 

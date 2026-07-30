@@ -296,3 +296,96 @@ def seed_question_set(
 
 def seed_activity_questions(session: Session) -> None:
     seed_question_set(session, IntakeQuestionSet.ACTIVITY, QUESTIONS, DEPENDS_ON)
+
+
+# Cairn IAR Question Set v0.1 (docs/Cairn-iar-questions.md). AS-D2 is split into
+# AS-D2 (yes/no gate) + AS-D2_NAME (the supplier name) + AS-D3, since depends_on
+# can only express "conditional on a specific answer", not "if answered" — the
+# same pattern as the activity set's C3/C3_DETAIL pair.
+ASSET_QUESTIONS: list[tuple] = [
+    # Section A — what it is
+    ("AS-A1", "A", "What it is",
+     "Which of these best describes it?",
+     None, IntakeAnswerKind.SINGLE_CHOICE,
+     {"choices": [
+         ["system", "A computer system or online service"],
+         ["database", "A database or large collection of records"],
+         ["software", "A software application"],
+         ["paper", "Paper files or records"],
+         ["physical", "Equipment, devices or media that hold information"],
+     ]},
+     "asset_type", False),
+    ("AS-A2", "A", "What it is",
+     "In plain English, what is it and what is it used for?",
+     None, IntakeAnswerKind.TEXTAREA, None, "description", False),
+    ("AS-A3", "A", "What it is",
+     "Is it still in everyday use?",
+     None, IntakeAnswerKind.SINGLE_CHOICE,
+     {"choices": [
+         ["in_use", "Still used"],
+         ["retiring", "Being phased out or replaced"],
+         ["disposed", "No longer used at all"],
+     ]},
+     "status", False),
+    # Section B — who looks after it
+    ("AS-B1", "B", "Who looks after it",
+     "Who looks after it day to day?",
+     "A person or team, e.g. \"HR admin team\".",
+     IntakeAnswerKind.TEXT, None, "custodian", False),
+    ("AS-B2", "B", "Who looks after it",
+     "Who is the senior person responsible for it?",
+     "The person who would decide if it changed or was got rid of — its owner.",
+     IntakeAnswerKind.TEXT, None, "notes", False),
+    ("AS-B3", "B", "Who looks after it",
+     "Do any other teams or departments use or rely on it? Which ones?",
+     "Your own department is already recorded — list any others.",
+     IntakeAnswerKind.TEXT, None, "business_functions", False),
+    # Section C — the information it holds
+    ("AS-C1", "C", "The information it holds",
+     "Does it hold information about people?",
+     "Staff, the public, anyone — however routine.",
+     IntakeAnswerKind.YES_NO, None, "contains_personal_data", False),
+    ("AS-C2", "C", "The information it holds",
+     "Roughly what information about people does it hold?",
+     "Names and contact details? Health information? Photographs or recordings?",
+     IntakeAnswerKind.TEXTAREA, None, "notes", False),
+    # Section D — where it is
+    ("AS-D1", "D", "Where it is",
+     "Where is it kept?",
+     "A building or room for paper; a supplier, data centre or \"the cloud\" for systems.",
+     IntakeAnswerKind.TEXT, None, "location", False),
+    ("AS-D2", "D", "Where it is",
+     "Is it provided or hosted by an outside company?",
+     None, IntakeAnswerKind.YES_NO, None, None, False),
+    ("AS-D2_NAME", "D", "Where it is",
+     "Which company?",
+     None, IntakeAnswerKind.TEXT, None, "supplier", False),
+    ("AS-D3", "D", "Where it is",
+     "Is any of the information kept outside the UK? Where?",
+     None, IntakeAnswerKind.TEXT, None, "hosting_country", False),
+    # Section E — how it's protected
+    ("AS-E1", "E", "How it's protected",
+     "How is it protected?",
+     "Locked rooms or cabinets, passwords, restricted access, encryption — pick all "
+     "that apply or suggest new ones.",
+     IntakeAnswerKind.VOCAB_MULTI, {"vocab": "security_measures"}, "security_measures", False),
+    # Section F — keeping and disposing
+    ("AS-F1", "F", "Keeping and disposing",
+     "How long is the information kept, and is that written down anywhere?",
+     None, IntakeAnswerKind.TEXT, None, "retention", False),
+    ("AS-F2", "F", "Keeping and disposing",
+     "When should this asset next be checked or reviewed?",
+     "Leave blank if you don't know.",
+     IntakeAnswerKind.DATE, None, "next_review_date", False),
+]
+
+
+ASSET_DEPENDS_ON: dict[str, dict] = {
+    "AS-D2_NAME": {"question": "AS-D2", "in": ["yes"]},
+    "AS-D3": {"question": "AS-D2", "in": ["yes"]},
+    "AS-C2": {"question": "AS-C1", "in": ["yes"]},
+}
+
+
+def seed_asset_questions(session: Session) -> None:
+    seed_question_set(session, IntakeQuestionSet.ASSET, ASSET_QUESTIONS, ASSET_DEPENDS_ON)

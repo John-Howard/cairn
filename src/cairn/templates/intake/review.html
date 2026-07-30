@@ -39,14 +39,20 @@
     <div class="govuk-button-group govuk-!-margin-top-6">
       <form method="post" action="/intake/{{ submission.id }}/submit">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit" class="govuk-button" data-module="govuk-button">Submit — create the draft record</button>
+        <button type="submit" class="govuk-button" data-module="govuk-button">
+          {% if submission.question_set.value == "asset" %}Submit — propose this asset{% else %}Submit — create the draft record{% endif %}
+        </button>
       </form>
       <form method="post" action="/intake/{{ submission.id }}/cancel">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="govuk-button govuk-button--warning" data-module="govuk-button">Cancel this intake</button>
       </form>
     </div>
+    {% if submission.question_set.value == "asset" %}
+    <p class="govuk-body-s">Submitting creates a <strong>proposed</strong> information asset for the IG team to curate — nothing is published to the register until it has been reviewed and approved.</p>
+    {% else %}
     <p class="govuk-body-s">Submitting creates a <strong>draft</strong> processing activity for the IG team to curate — nothing is published to the register until it has been reviewed and approved.</p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

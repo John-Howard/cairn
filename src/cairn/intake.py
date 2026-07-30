@@ -22,6 +22,7 @@ from cairn.auth import get_csrf_token, require_role, verify_csrf
 from cairn.db import get_session
 from cairn.inheritance import sync_inherited_security
 from cairn.models import (
+    AssetStatus,
     AssetType,
     BusinessFunction,
     ControllerOrProcessor,
@@ -30,11 +31,13 @@ from cairn.models import (
     ExternalDataSource,
     ExternalDataUseMode,
     InformationAsset,
+    IntakeAnswerKind,
     IntakeGap,
     IntakeQuestion,
     IntakeQuestionSet,
     IntakeStatus,
     IntakeSubmission,
+    LegalEntity,
     LifecycleStage,
     PersonalDataCategory,
     ProcessingActivity,
@@ -42,7 +45,10 @@ from cairn.models import (
     RecipientType,
     RecordStatus,
     RegimeSource,
+    RetentionRule,
     Role,
+    SecurityMeasure,
+    SecurityMeasureCategory,
     User,
 )
 from cairn.regime import resolve_regime
@@ -53,8 +59,6 @@ router = APIRouter()
 
 require_intake_user = require_role(Role.CONTRIBUTOR, Role.CURATOR, Role.APPROVER_DPO)
 require_curator_or_approver = require_role(Role.CURATOR, Role.APPROVER_DPO)
-
-SECTION_ORDER = ["B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,7 @@ VOCABS: dict[str, VocabConfig] = {
     "external_sources": VocabConfig(
         ExternalDataSource, label_attr="name", activity_attr="data_sources"
     ),
+    "security_measures": VocabConfig(SecurityMeasure),
 }
 
 
@@ -98,10 +103,28 @@ def is_enforcement_function(function: BusinessFunction) -> bool:
     return function.label in ENFORCEMENT_FUNCTIONS
 
 
-def sections_for(submission: IntakeSubmission) -> list[str]:
+def _section_order(session: Session, question_set: IntakeQuestionSet) -> list[str]:
+    """Distinct sections for a question set, in seeded order — B–K for activity,
+    A–F for asset. Derived from the seed data rather than hardcoded."""
+    questions = session.scalars(
+        select(IntakeQuestion.section)
+        .where(IntakeQuestion.question_set == question_set)
+        .order_by(IntakeQuestion.order)
+    ).all()
+    sections: list[str] = []
+    for section in questions:
+        if section not in sections:
+            sections.append(section)
+    return sections
+
+
+def sections_for(session: Session, submission: IntakeSubmission) -> list[str]:
+    sections = _section_order(session, submission.question_set)
+    if submission.question_set != IntakeQuestionSet.ACTIVITY:
+        return sections
     if is_enforcement_function(submission.business_function):
-        return SECTION_ORDER
-    return [s for s in SECTION_ORDER if s != "K"]
+        return sections
+    return [s for s in sections if s != "K"]
 
 
 def _questions(
@@ -286,6 +309,21 @@ def _parse_date(raw: object) -> date | None:
         return None
 
 
+def _split_team_names(raw: str) -> list[str]:
+    return [part.strip() for part in raw.replace(",", ";").split(";") if part.strip()]
+
+
+def _coerce_enum(enum_type, raw: object, default):
+    """Single-choice answers are stored as posted, so a malformed form must not
+    reach the model as an invalid enum value."""
+    if not isinstance(raw, str) or not raw:
+        return default
+    try:
+        return enum_type(raw)
+    except ValueError:
+        return default
+
+
 def apply_submission(
     session: Session, submission: IntakeSubmission, actor: User
 ) -> ProcessingActivity:
@@ -379,7 +417,7 @@ def apply_submission(
     if activity.assets:
         sync_inherited_security(session, activity)
 
-    asked = {q.code: q for q in _questions(session)}
+    asked = {q.code: q for q in _questions(session, question_set=submission.question_set)}
     if not is_enforcement_function(submission.business_function):
         asked = {c: q for c, q in asked.items() if not q.enforcement_only}
     for code, question in asked.items():
@@ -409,6 +447,140 @@ def apply_submission(
     return activity
 
 
+def apply_asset_submission(
+    session: Session, submission: IntakeSubmission, actor: User
+) -> InformationAsset:
+    """Create the proposed InformationAsset (and proposals, and gaps) from the answers.
+    The IAO named in AS-B2 is text, not an account pick — deny-by-default account
+    linking is preserved; the curator binds iao_user_id on approval."""
+    questions_by_code = {
+        q.code: q for q in _questions(session, question_set=IntakeQuestionSet.ASSET)
+    }
+    notes: list[str] = []
+
+    def add_gap(code: str) -> None:
+        session.add(
+            IntakeGap(
+                submission_id=submission.id,
+                asset_id=asset.id,
+                question_code=code,
+                question_text=questions_by_code[code].text,
+            )
+        )
+
+    asset_type_value = _value(submission, "AS-A1")
+    status_value = _value(submission, "AS-A3")
+    asset = InformationAsset(
+        label=submission.subject_name,
+        asset_type=_coerce_enum(AssetType, asset_type_value, AssetType.SYSTEM),
+        description=_value(submission, "AS-A2") or None,
+        status=_coerce_enum(AssetStatus, status_value, AssetStatus.IN_USE),
+        custodian=_value(submission, "AS-B1") or None,
+        contains_personal_data=_yes(submission, "AS-C1"),
+        location=_value(submission, "AS-D1") or None,
+        hosting_country=_value(submission, "AS-D3") or None,
+        next_review_date=_parse_date(_value(submission, "AS-F2")),
+        entry_status=EntryStatus.PROPOSED,
+    )
+    session.add(asset)
+    session.flush()
+
+    asset.business_functions.append(submission.business_function)
+    other_teams_raw = _value(submission, "AS-B3") or ""
+    if other_teams_raw:
+        existing_functions = {
+            bf.label.lower(): bf for bf in session.scalars(select(BusinessFunction)).all()
+        }
+        unmatched = []
+        for name in _split_team_names(other_teams_raw):
+            match = existing_functions.get(name.lower())
+            if match is None:
+                unmatched.append(name)
+            elif match not in asset.business_functions:
+                asset.business_functions.append(match)
+        if unmatched:
+            notes.append("Other teams named but not matched: " + "; ".join(unmatched))
+            add_gap("AS-B3")
+
+    named_owner = _value(submission, "AS-B2")
+    if named_owner:
+        notes.append(f"Named senior owner: {named_owner}")
+        add_gap("AS-B2")
+
+    what_it_holds = _value(submission, "AS-C2")
+    if what_it_holds:
+        notes.append(f"What it holds (respondent's words): {what_it_holds}")
+
+    supplier_name = _value(submission, "AS-D2_NAME")
+    if supplier_name:
+        suppliers = {le.label.lower(): le for le in session.scalars(select(LegalEntity)).all()}
+        supplier = suppliers.get(supplier_name.lower())
+        if supplier is not None:
+            asset.supplier_entity_id = supplier.id
+        else:
+            notes.append(f"Named supplier (not matched): {supplier_name}")
+            add_gap("AS-D2_NAME")
+
+    retention_name = _value(submission, "AS-F1")
+    if retention_name:
+        rules = {
+            r.label.lower(): r
+            for r in session.scalars(select(RetentionRule)).all()
+            if r.entry_status != EntryStatus.REJECTED
+        }
+        rule = rules.get(retention_name.lower())
+        if rule is not None:
+            asset.default_retention_id = rule.id
+        else:
+            notes.append(f"Stated retention (not matched to a rule): {retention_name}")
+            add_gap("AS-F1")
+
+    proposals: dict[str, list[str]] = {}
+    entries, new_names = _vocab_selection(session, submission, "AS-E1", "security_measures")
+    for entry in entries:
+        if entry not in asset.security_measures:
+            asset.security_measures.append(entry)
+    for name in new_names:
+        measure = SecurityMeasure(
+            label=name,
+            category=SecurityMeasureCategory.ORGANISATIONAL,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        session.add(measure)
+        session.flush()
+        asset.security_measures.append(measure)
+        proposals.setdefault("security_measures", []).append(name)
+
+    asset.notes = "\n".join(notes) if notes else None
+    session.flush()
+
+    for code, question in questions_by_code.items():
+        if _dont_know(submission, code) and condition_met(
+            submission.answers, question.depends_on
+        ):
+            session.add(
+                IntakeGap(
+                    submission_id=submission.id,
+                    asset_id=asset.id,
+                    question_code=code,
+                    question_text=question.text,
+                )
+            )
+
+    submission.status = IntakeStatus.SUBMITTED
+    submission.asset_id = asset.id
+    submission.change_note = "Intake submitted"
+    session.flush()
+    record_event(
+        session,
+        entity=submission,
+        event="intake_submitted",
+        actor=actor,
+        new_value={"asset": asset.id, "proposals": proposals},
+    )
+    return asset
+
+
 def _base_context(request: Request, user: User) -> dict:
     return {"user": user, "csrf_token": get_csrf_token(request)}
 
@@ -433,24 +605,66 @@ def intake_list(
     )
 
 
+def _start_context(request: Request, user: User, session: Session, error: str | None) -> dict:
+    functions = session.scalars(
+        select(BusinessFunction).order_by(BusinessFunction.label)
+    ).all()
+    return {
+        **_base_context(request, user),
+        "functions": functions,
+        "own_function_id": user.business_function_id,
+        "error": error,
+    }
+
+
+def _resolve_start_function(session: Session, user: User, form) -> BusinessFunction | None:
+    function_id = form.get("business_function_id")
+    if user.role == Role.CONTRIBUTOR and user.business_function_id:
+        function_id = user.business_function_id
+    return session.get(BusinessFunction, function_id) if function_id else None
+
+
+async def _handle_start(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    question_set: IntakeQuestionSet,
+    template: str,
+    missing_error: str,
+):
+    """Shared start-screen submit for both question sets: returns the created
+    submission, or a 422 re-render of the same template on missing input."""
+    form = await request.form()
+    verify_csrf(request, form.get("csrf_token"))
+    subject_name = (form.get("subject_name") or "").strip()
+    function = _resolve_start_function(session, user, form)
+    if not subject_name or function is None:
+        context = _start_context(request, user, session, missing_error)
+        return None, templates.TemplateResponse(
+            request, template, context, status_code=422
+        )
+    submission = IntakeSubmission(
+        subject_name=subject_name,
+        question_set=question_set,
+        business_function_id=function.id,
+        respondent_id=user.id,
+        respondent_contact=(form.get("respondent_contact") or "").strip() or None,
+        answers={},
+    )
+    session.add(submission)
+    session.flush()
+    return submission, None
+
+
 @router.get("/intake/new")
 def intake_start_form(
     request: Request,
     user: User = Depends(require_intake_user),
     session: Session = Depends(get_session),
 ):
-    functions = session.scalars(
-        select(BusinessFunction).order_by(BusinessFunction.label)
-    ).all()
     return templates.TemplateResponse(
-        request,
-        "intake/start.html",
-        {
-            **_base_context(request, user),
-            "functions": functions,
-            "own_function_id": user.business_function_id,
-            "error": None,
-        },
+        request, "intake/start.html", _start_context(request, user, session, None)
     )
 
 
@@ -460,39 +674,81 @@ async def intake_start(
     user: User = Depends(require_intake_user),
     session: Session = Depends(get_session),
 ):
-    form = await request.form()
-    verify_csrf(request, form.get("csrf_token"))
-    subject_name = (form.get("subject_name") or "").strip()
-    function_id = form.get("business_function_id")
-    if user.role == Role.CONTRIBUTOR and user.business_function_id:
-        function_id = user.business_function_id
-    function = session.get(BusinessFunction, function_id) if function_id else None
-    if not subject_name or function is None:
-        functions = session.scalars(
-            select(BusinessFunction).order_by(BusinessFunction.label)
-        ).all()
-        return templates.TemplateResponse(
-            request,
-            "intake/start.html",
-            {
-                **_base_context(request, user),
-                "functions": functions,
-                "own_function_id": user.business_function_id,
-                "error": "Enter a short name for the activity and choose a department",
-            },
-            status_code=422,
-        )
-    submission = IntakeSubmission(
-        subject_name=subject_name,
+    submission, error_response = await _handle_start(
+        request,
+        user,
+        session,
         question_set=IntakeQuestionSet.ACTIVITY,
-        business_function_id=function.id,
-        respondent_id=user.id,
-        respondent_contact=(form.get("respondent_contact") or "").strip() or None,
-        answers={},
+        template="intake/start.html",
+        missing_error="Enter a short name for the activity and choose a department",
     )
-    session.add(submission)
-    session.flush()
+    if error_response is not None:
+        return error_response
     return RedirectResponse(f"/intake/{submission.id}/section/B", status_code=302)
+
+
+# Registered before /intake/{submission_id} so the literal path wins the match.
+@router.get("/intake/assets/new")
+def intake_asset_start_form(
+    request: Request,
+    user: User = Depends(require_intake_user),
+    session: Session = Depends(get_session),
+):
+    return templates.TemplateResponse(
+        request, "intake/asset_start.html", _start_context(request, user, session, None)
+    )
+
+
+@router.post("/intake/assets")
+async def intake_asset_start(
+    request: Request,
+    user: User = Depends(require_intake_user),
+    session: Session = Depends(get_session),
+):
+    submission, error_response = await _handle_start(
+        request,
+        user,
+        session,
+        question_set=IntakeQuestionSet.ASSET,
+        template="intake/asset_start.html",
+        missing_error="Enter a short name for the asset and choose a department",
+    )
+    if error_response is not None:
+        return error_response
+    first_section = _section_order(session, IntakeQuestionSet.ASSET)[0]
+    return RedirectResponse(
+        f"/intake/{submission.id}/section/{first_section}", status_code=302
+    )
+
+
+@router.get("/intake/assets/similar")
+def intake_asset_similar(
+    request: Request,
+    subject_name: str = "",
+    user: User = Depends(require_intake_user),
+    session: Session = Depends(get_session),
+):
+    """Advisory like-named-asset hint for the start screen. The parameter is named
+    for the input htmx reads it from — htmx posts the field's own name."""
+    query = subject_name.strip()
+    matches: list[InformationAsset] = []
+    if len(query) >= 2:
+        matches = list(
+            session.scalars(
+                select(InformationAsset)
+                .where(
+                    InformationAsset.entry_status != EntryStatus.REJECTED,
+                    InformationAsset.label.ilike(f"%{query}%"),
+                )
+                .order_by(InformationAsset.label)
+                .limit(5)
+            )
+        )
+    return templates.TemplateResponse(
+        request,
+        "intake/_asset_similar.html",
+        {"user": user, "matches": matches},
+    )
 
 
 # Registered before /intake/{submission_id} so the literal path wins the match.
@@ -605,8 +861,11 @@ def intake_view(
 ):
     submission = _get_submission(session, submission_id, user)
     if submission.status == IntakeStatus.IN_PROGRESS:
-        return RedirectResponse(f"/intake/{submission_id}/section/B", status_code=302)
-    questions = _questions(session)
+        first_section = sections_for(session, submission)[0]
+        return RedirectResponse(
+            f"/intake/{submission_id}/section/{first_section}", status_code=302
+        )
+    questions = _questions(session, question_set=submission.question_set)
     if not is_enforcement_function(submission.business_function):
         questions = [q for q in questions if not q.enforcement_only]
     return templates.TemplateResponse(
@@ -622,8 +881,8 @@ def intake_view(
     )
 
 
-def _section_or_404(submission: IntakeSubmission, section: str) -> list[str]:
-    sections = sections_for(submission)
+def _section_or_404(session: Session, submission: IntakeSubmission, section: str) -> list[str]:
+    sections = sections_for(session, submission)
     if section not in sections:
         raise HTTPException(status_code=404)
     return sections
@@ -653,11 +912,13 @@ def _render_tree(submission_answers: dict, questions: list[IntakeQuestion]) -> l
     return items
 
 
-def normalise_answers(session: Session, answers: dict) -> dict:
+def normalise_answers(
+    session: Session, answers: dict, question_set: IntakeQuestionSet
+) -> dict:
     """Reset any lingering answer whose depends_on is no longer met — e.g. the
     respondent went back and changed the parent. Server-side authority; the
     conditional reveals are only a courtesy."""
-    for question in _questions(session):
+    for question in _questions(session, question_set=question_set):
         if question.depends_on is None:
             continue
         entry = answers.get(question.code)
@@ -666,10 +927,23 @@ def normalise_answers(session: Session, answers: dict) -> dict:
     return answers
 
 
-def validate_section(section: str, answers: dict) -> list[dict]:
-    """True contradictions only — intake stays tolerant of everything else."""
+def _vocab_questions(session: Session, question_set: IntakeQuestionSet) -> list[tuple[str, str]]:
+    return [
+        (q.code, q.options["vocab"])
+        for q in _questions(session, question_set=question_set)
+        if q.answer_kind == IntakeAnswerKind.VOCAB_MULTI
+    ]
+
+
+def validate_section(
+    section: str, answers: dict, question_set: IntakeQuestionSet
+) -> list[dict]:
+    """True contradictions only — intake stays tolerant of everything else.
+    The C4/C5 processor-vs-joint contradiction is an activity-only check; the
+    asset set also has a section "C" (a different meaning), so gate explicitly
+    on question_set rather than relying on the code lookup to simply miss."""
     errors: list[dict] = []
-    if section == "C":
+    if question_set == IntakeQuestionSet.ACTIVITY and section == "C":
         if (
             _effective_value(answers, "C4") == "yes"
             and _effective_value(answers, "C5") == "yes"
@@ -699,7 +973,7 @@ def _section_context(
     answers: dict | None = None,
     errors: list[dict] | None = None,
 ) -> dict:
-    questions = _questions(session, section)
+    questions = _questions(session, section, submission.question_set)
     vocab_options = {}
     for question in questions:
         if question.answer_kind.value == "vocab_multi":
@@ -740,7 +1014,7 @@ def intake_section_form(
 ):
     submission = _get_submission(session, submission_id, user)
     _require_in_progress(submission)
-    sections = _section_or_404(submission, section)
+    sections = _section_or_404(session, submission, section)
     context = _section_context(request, user, session, submission, section, sections)
     return templates.TemplateResponse(request, "intake/section.html", context)
 
@@ -755,15 +1029,16 @@ async def intake_section_save(
 ):
     submission = _get_submission(session, submission_id, user)
     _require_in_progress(submission)
-    sections = _section_or_404(submission, section)
+    sections = _section_or_404(session, submission, section)
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
-    questions = _questions(session, section)
+    questions = _questions(session, section, submission.question_set)
     merged = normalise_answers(
         session,
         {**submission.answers, **parse_section_form(session, questions, form)},
+        submission.question_set,
     )
-    errors = validate_section(section, merged)
+    errors = validate_section(section, merged, submission.question_set)
     if errors:
         context = _section_context(
             request, user, session, submission, section, sections,
@@ -795,18 +1070,12 @@ def intake_review(
 ):
     submission = _get_submission(session, submission_id, user)
     _require_in_progress(submission)
-    sections = sections_for(submission)
-    questions = _questions(session)
+    sections = sections_for(session, submission)
+    questions = _questions(session, question_set=submission.question_set)
     if "K" not in sections:
         questions = [q for q in questions if not q.enforcement_only]
     proposals: dict[str, list[str]] = {}
-    for code, vocab_key in [
-        ("D1", "data_subjects"),
-        ("E1", "data_categories"),
-        ("F2", "external_sources"),
-        ("G1", "recipients"),
-        ("H1", "systems"),
-    ]:
+    for code, vocab_key in _vocab_questions(session, submission.question_set):
         _entries, new_names = _vocab_selection(session, submission, code, vocab_key)
         if new_names:
             proposals[vocab_key] = new_names
@@ -842,6 +1111,9 @@ async def intake_submit(
     _require_in_progress(submission)
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
+    if submission.question_set == IntakeQuestionSet.ASSET:
+        asset = apply_asset_submission(session, submission, user)
+        return RedirectResponse(f"/assets/{asset.id}", status_code=302)
     activity = apply_submission(session, submission, user)
     return RedirectResponse(f"/activities/{activity.id}", status_code=302)
 

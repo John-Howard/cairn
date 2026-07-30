@@ -12,6 +12,8 @@
       {% else %}<strong class="govuk-tag govuk-tag--grey">Cancelled</strong>{% endif %}
       {% if submission.activity_id %}
       &nbsp;<a class="govuk-link" href="/activities/{{ submission.activity_id }}">Go to the draft activity</a>
+      {% elif submission.asset_id %}
+      &nbsp;<a class="govuk-link" href="/assets/{{ submission.asset_id }}">Go to the proposed asset</a>
       {% endif %}
     </p>
     {% if submission.respondent_contact %}

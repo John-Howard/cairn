@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from cairn.activities import RECORD_STATUS_LABELS, REGIME_LABELS
 from cairn.audit import record_event
-from cairn.auth import current_user, get_csrf_token
+from cairn.auth import current_user, get_csrf_token, require_role
 from cairn.complaints import complaint_status
 from cairn.db import get_session
 from cairn.export import EXPORT_VIEWS, build_export_context, export_views, render_csv
@@ -21,6 +21,7 @@ from cairn.models import (
     ProcessingActivity,
     RecordStatus,
     Regime,
+    Role,
     User,
     activity_asset,
 )
@@ -31,6 +32,10 @@ from cairn.vocabularies import pending_proposals_count
 router = APIRouter()
 
 TRIAL_WINDOW_DAYS = 60
+
+require_add_user = require_role(Role.CONTRIBUTOR, Role.CURATOR, Role.APPROVER_DPO)
+require_review_user = require_role(Role.CURATOR, Role.APPROVER_DPO)
+require_manage_user = require_role(Role.APPROVER_DPO)
 
 COMMENCEMENT_LABELS = {
     "duaa_principal": (
@@ -203,6 +208,46 @@ def dashboard(
     )
 
 
+@router.get("/add")
+def add_information(
+    request: Request,
+    user: User = Depends(require_add_user),
+):
+    return templates.TemplateResponse(
+        request,
+        "add.html",
+        {
+            "user": user,
+            "can_curate": user.role in (Role.CURATOR, Role.APPROVER_DPO),
+            "csrf_token": get_csrf_token(request),
+        },
+    )
+
+
+@router.get("/review")
+def review(
+    request: Request,
+    user: User = Depends(require_review_user),
+):
+    return templates.TemplateResponse(
+        request,
+        "review.html",
+        {"user": user, "csrf_token": get_csrf_token(request)},
+    )
+
+
+@router.get("/manage")
+def manage(
+    request: Request,
+    user: User = Depends(require_manage_user),
+):
+    return templates.TemplateResponse(
+        request,
+        "manage.html",
+        {"user": user, "csrf_token": get_csrf_token(request)},
+    )
+
+
 @router.get("/register")
 def register(
     request: Request,
@@ -217,6 +262,9 @@ def register(
     ).all()
     function_labels = _function_labels(session)
     users_by_id = {u.id: u.display_name for u in session.scalars(select(User)).all()}
+    show_s61 = Regime.LAW_ENFORCEMENT in profile.applicable_regimes
+    export_keys = ["art30_1", "art30_2", *(["s61"] if show_s61 else []), "combined"]
+    export_links = [(EXPORT_VIEWS[key].title, key) for key in export_keys]
     rows = [
         {
             "activity": activity,
@@ -234,7 +282,8 @@ def register(
             "rows": rows,
             "record_status_labels": RECORD_STATUS_LABELS,
             "regime_labels": REGIME_LABELS,
-            "show_s61": Regime.LAW_ENFORCEMENT in profile.applicable_regimes,
+            "show_s61": show_s61,
+            "export_links": export_links,
             "csrf_token": get_csrf_token(request),
         },
     )

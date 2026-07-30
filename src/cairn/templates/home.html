@@ -4,24 +4,15 @@
 <h1 class="govuk-heading-l">{{ profile.org_name }}</h1>
 <p class="govuk-body">Signed in as {{ user.display_name }} ({{ user.role.value }}).</p>
 
-<nav class="govuk-!-margin-bottom-6">
-  <a class="govuk-link govuk-!-margin-right-4" href="/register">Register</a>
-  <a class="govuk-link govuk-!-margin-right-4" href="/activities">Processing activities</a>
-  <a class="govuk-link govuk-!-margin-right-4" href="/assets">Information assets</a>
-  <a class="govuk-link govuk-!-margin-right-4" href="/vocabularies">Vocabularies</a>
-  {% if user.role.value in ("contributor", "curator", "approver_dpo") %}
-  <a class="govuk-link govuk-!-margin-right-4" href="/intake">Intake</a>
-  <a class="govuk-link govuk-!-margin-right-4" href="/intake/assets/new">Asset intake</a>
+<p class="govuk-body">
+  {% if user.role.value == "contributor" %}
+  <a class="govuk-link" href="/add">Add information</a> about an activity or asset you know about.
+  {% elif user.role.value == "curator" %}
+  <a class="govuk-link" href="/review">Review</a> intake gaps, proposals and information assets awaiting approval.
+  {% else %}
+  See the <a class="govuk-link" href="/register">registers</a> of processing activities and information assets.
   {% endif %}
-  {% if user.role.value in ("curator", "approver_dpo") %}
-  <a class="govuk-link govuk-!-margin-right-4" href="/intake/gaps">Intake gaps</a>
-  <a class="govuk-link govuk-!-margin-right-4" href="/complaints">Complaints</a>
-  {% endif %}
-  {% if user.role.value == "approver_dpo" %}
-  <a class="govuk-link govuk-!-margin-right-4" href="/regime-policy">Regime Policy</a>
-  <a class="govuk-link" href="/users">Users</a>
-  {% endif %}
-</nav>
+</p>
 
 <h2 class="govuk-heading-m">Register overview</h2>
 <p class="govuk-body">{{ total_activities }} processing activit{{ "y" if total_activities == 1 else "ies" }} recorded.</p>

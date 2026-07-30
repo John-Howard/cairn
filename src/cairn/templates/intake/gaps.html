@@ -5,7 +5,7 @@
   <div class="govuk-grid-column-two-thirds">
     <a href="/intake" class="govuk-back-link">Back to intake</a>
     <h1 class="govuk-heading-l">Intake gaps</h1>
-    <p class="govuk-body">Every "don't know" recorded during intake, for IG follow-up. Resolve each gap after the interview or document review that answered it — record what was established, then apply the substance to the draft activity or the proposed asset.</p>
+    <p class="govuk-body">Everything from intake that needs IG follow-up: every "don't know", plus answers only a curator can act on — a named person to bind to a user account, or a name that matched no existing record. Resolve each gap after the interview, document review or decision that settled it — record what was established, then apply the substance to the draft activity or the proposed asset.</p>
     <p class="govuk-body"><strong class="govuk-tag {% if open_count %}govuk-tag--red{% else %}govuk-tag--green{% endif %}">{{ open_count }} open</strong></p>
   </div>
 </div>
@@ -40,7 +40,7 @@
   </div>
 </div>
 {% else %}
-<p class="govuk-body">No open gaps — every "don't know" has been followed up.</p>
+<p class="govuk-body">No open gaps — everything recorded at intake has been followed up.</p>
 {% endfor %}
 
 {% if resolved %}

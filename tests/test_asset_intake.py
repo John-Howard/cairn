@@ -523,3 +523,25 @@ def test_asset_detail_no_intake_section_for_manually_created_asset(
     _login(client, engine, "Cara Curator")
     page = client.get(f"/assets/{asset_id}").text
     assert "Created from intake" not in page
+
+
+def test_gaps_queue_does_not_describe_gaps_as_only_dont_knows(
+    activities_client, activities_web_engine
+):
+    """Asset intake records gaps for answered questions too — a named owner to
+    bind to an account, and names that matched no existing record. Describing
+    the queue as "every don't know" understates what a curator will find."""
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cara Curator")
+    submission_id = _start_asset(client, engine, name="Answered-but-gapped asset")
+    _save_section(client, submission_id, "B", {"AS-B2": "Jo Smith, Head of HR"})
+    asset_id = _submit(client, submission_id)
+
+    with Session(engine) as db:
+        gaps = db.scalars(select(IntakeGap).where(IntakeGap.asset_id == asset_id)).all()
+        answered_gap = [g for g in gaps if g.question_code == "AS-B2"]
+    assert answered_gap, "AS-B2 should raise a gap even though it was answered"
+
+    page = client.get("/intake/gaps").text
+    assert "AS-B2" in page
+    assert "Every \"don't know\"" not in page

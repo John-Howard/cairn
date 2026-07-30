@@ -4,16 +4,72 @@
 <h1 class="govuk-heading-l">{{ profile.org_name }}</h1>
 <p class="govuk-body">Signed in as {{ user.display_name }} ({{ user.role.value }}).</p>
 
+{% if "your_intake" in sections %}
+<h2 class="govuk-heading-m">Your intake</h2>
+{% if my_total %}
 <p class="govuk-body">
-  {% if user.role.value == "contributor" %}
-  <a class="govuk-link" href="/add">Add information</a> about an activity or asset you know about.
-  {% elif user.role.value == "curator" %}
-  <a class="govuk-link" href="/review">Review</a> intake gaps, proposals and information assets awaiting approval.
-  {% else %}
-  See the <a class="govuk-link" href="/register">registers</a> of processing activities and information assets.
-  {% endif %}
+  You have {{ my_submitted_count }} submitted
+  {{ "run" if my_submitted_count == 1 else "runs" }}{% if my_open_gaps %}, and
+  {{ my_open_gaps }} question{{ "" if my_open_gaps == 1 else "s" }} you answered
+  "don't know" that the IG team may come back to you about{% endif %}.
 </p>
+{% if my_in_progress %}
+<h3 class="govuk-heading-s">Not finished yet</h3>
+<table class="govuk-table">
+  <tbody class="govuk-table__body">
+    {% for submission in my_in_progress %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">
+        <a class="govuk-link" href="/intake/{{ submission.id }}">{{ submission.subject_name }}</a>
+      </td>
+      <td class="govuk-table__cell">
+        {{ "Asset" if submission.question_set.value == "asset" else "Activity" }}
+      </td>
+      <td class="govuk-table__cell">Continue where you left off</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% else %}
+<p class="govuk-body">You have not started any intake yet. There is nothing to prepare — the questions are about your day job, and "don't know" is a valid answer to any of them.</p>
+{% endif %}
 
+<h2 class="govuk-heading-m">Add information</h2>
+<ul class="govuk-list">
+  <li><a class="govuk-link" href="/intake/new">Describe an activity</a> — something your team does with information about people.</li>
+  <li><a class="govuk-link" href="/intake/assets/new">Describe an information asset</a> — a system, database, application or collection of records.</li>
+</ul>
+{% endif %}
+
+{% if "attention" in sections %}
+<h2 class="govuk-heading-m">Needs your attention</h2>
+<table class="govuk-table">
+  <tbody class="govuk-table__body">
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Open intake gaps</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/intake/gaps">{{ open_gap_count }}</a></td>
+    </tr>
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Pending vocabulary proposals</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/vocabularies">{{ pending_proposals }}</a></td>
+    </tr>
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Information assets awaiting approval</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/assets">{{ proposed_asset_count }}</a></td>
+    </tr>
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">Findings across non-retired activities</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">
+        <strong class="govuk-tag govuk-tag--red">{{ block_count }} blocking</strong>
+        <strong class="govuk-tag govuk-tag--yellow">{{ warn_count }} warning</strong>
+      </td>
+    </tr>
+  </tbody>
+</table>
+{% endif %}
+
+{% if "register_overview" in sections %}
 <h2 class="govuk-heading-m">Register overview</h2>
 <p class="govuk-body">{{ total_activities }} processing activit{{ "y" if total_activities == 1 else "ies" }} recorded.</p>
 
@@ -60,8 +116,9 @@
     </table>
   </div>
 </div>
+{% endif %}
 
-{% if commencement_watch %}
+{% if "commencement" in sections and commencement_watch %}
 <div class="govuk-inset-text">
   <h2 class="govuk-heading-s">DUAA commencement</h2>
   <ul class="govuk-list">
@@ -72,23 +129,13 @@
 </div>
 {% endif %}
 
-<h2 class="govuk-heading-m">Findings</h2>
-<p class="govuk-body">
-  Across non-retired activities:
-  <strong class="govuk-tag govuk-tag--red">{{ block_count }} blocking</strong>
-  <strong class="govuk-tag govuk-tag--yellow">{{ warn_count }} warning</strong>
-</p>
-
-<h2 class="govuk-heading-m">Assurance &amp; export</h2>
+{% if "assurance" in sections %}
+<h2 class="govuk-heading-m">Assurance</h2>
 <table class="govuk-table">
   <tbody class="govuk-table__body">
     <tr class="govuk-table__row">
       <td class="govuk-table__cell">Review compliance</td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ review_compliance ~ "%" if review_compliance is not none else "—" }}</td>
-    </tr>
-    <tr class="govuk-table__row">
-      <td class="govuk-table__cell">Pending vocabulary proposals</td>
-      <td class="govuk-table__cell govuk-table__cell--numeric"><a class="govuk-link" href="/vocabularies">{{ pending_proposals }}</a></td>
     </tr>
     <tr class="govuk-table__row">
       <td class="govuk-table__cell">Activities blocked from approval</td>
@@ -97,30 +144,31 @@
   </tbody>
 </table>
 
+<h3 class="govuk-heading-s">Export coverage</h3>
+<p class="govuk-body">Active activities appearing in each statutory view. Download them from the <a class="govuk-link" href="/register">combined register</a>.</p>
 <table class="govuk-table">
   <thead class="govuk-table__head">
     <tr class="govuk-table__row">
       <th scope="col" class="govuk-table__header">View</th>
-      <th scope="col" class="govuk-table__header">Active activities</th>
-      <th scope="col" class="govuk-table__header">Download</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Active activities</th>
     </tr>
   </thead>
   <tbody class="govuk-table__body">
-    {% for title, key, count in export_coverage %}
+    {% for title, count in export_coverage %}
     <tr class="govuk-table__row">
       <td class="govuk-table__cell">{{ title }}</td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ count }}</td>
-      <td class="govuk-table__cell"><a class="govuk-link" href="/register/export/{{ key }}">Download CSV</a></td>
     </tr>
     {% endfor %}
     <tr class="govuk-table__row">
       <td class="govuk-table__cell">Information Asset Register</td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ total_assets }}</td>
-      <td class="govuk-table__cell"><a class="govuk-link" href="/assets/export.csv">Download CSV</a></td>
     </tr>
   </tbody>
 </table>
+{% endif %}
 
+{% if "asset_types" in sections %}
 <h2 class="govuk-heading-m">Information assets</h2>
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-one-half">
@@ -136,6 +184,7 @@
       </tbody>
     </table>
   </div>
+  {% if "asset_attention" in sections %}
   <div class="govuk-grid-column-one-half">
     <h3 class="govuk-heading-s">Attention needed</h3>
     <table class="govuk-table">
@@ -155,10 +204,13 @@
       </tbody>
     </table>
   </div>
+  {% endif %}
 </div>
+{% endif %}
 
+{% if "complaints" in sections %}
 <h2 class="govuk-heading-m">Complaints</h2>
-<p class="govuk-body">{{ open_complaints_count }} open complaint{{ "" if open_complaints_count == 1 else "s" }}.{% if user.role.value in ("curator", "approver_dpo") %} <a class="govuk-link" href="/complaints">View all</a>{% endif %}</p>
+<p class="govuk-body">{{ open_complaints_count }} open complaint{{ "" if open_complaints_count == 1 else "s" }}. <a class="govuk-link" href="/complaints">View all</a></p>
 {% if complaints_attention %}
 <table class="govuk-table">
   <thead class="govuk-table__head">
@@ -181,7 +233,9 @@
 {% else %}
 <p class="govuk-body">No complaints needing attention.</p>
 {% endif %}
+{% endif %}
 
+{% if "overdue" in sections %}
 <h2 class="govuk-heading-m">Overdue reviews</h2>
 {% if overdue %}
 <table class="govuk-table">
@@ -205,7 +259,9 @@
 {% else %}
 <p class="govuk-body">No overdue reviews.</p>
 {% endif %}
+{% endif %}
 
+{% if "trials" in sections %}
 <h2 class="govuk-heading-m">Trials ending soon</h2>
 {% if trials_due %}
 <table class="govuk-table">
@@ -234,5 +290,6 @@
 </table>
 {% else %}
 <p class="govuk-body">No trials ending within 60 days.</p>
+{% endif %}
 {% endif %}
 {% endblock %}

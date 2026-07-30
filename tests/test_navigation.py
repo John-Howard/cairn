@@ -88,13 +88,20 @@ def test_register_page_has_sibling_register_links(activities_client, activities_
     assert 'href="/assets/export.csv"' in response.text
 
 
-def test_dashboard_no_longer_links_asset_intake_directly(
+def test_nav_does_not_duplicate_the_asset_intake_wizard(
     activities_client, activities_web_engine
 ):
+    """The wizard belongs under Add information, not as its own nav entry. It may
+    still appear in page content as a call to action — the duplication that
+    confused people was in the menu itself."""
     _login(activities_client, activities_web_engine, "Cody Contributor")
     response = activities_client.get("/")
     assert response.status_code == 200
-    assert 'href="/intake/assets/new"' not in response.text
+    nav = response.text[
+        response.text.index("govuk-service-navigation") : response.text.index("</nav>")
+    ]
+    assert "/intake/assets/new" not in nav
+    assert "/intake" not in nav
 
 
 def test_nav_renders_on_non_dashboard_page(seeded_client, seeded_web_engine):

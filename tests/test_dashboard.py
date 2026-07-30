@@ -84,7 +84,7 @@ def _seed_dashboard_activities(engine) -> None:
 
 def test_dashboard_counts_and_lists(activities_client, activities_web_engine):
     _seed_dashboard_activities(activities_web_engine)
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "4 processing activities recorded" in response.text
@@ -99,7 +99,7 @@ def test_dashboard_counts_and_lists(activities_client, activities_web_engine):
 
 
 def test_dashboard_empty_state(activities_client, activities_web_engine):
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "0 processing activities recorded" in response.text
@@ -120,7 +120,7 @@ def test_dashboard_review_compliance_and_blocked(activities_client, activities_w
         overdue.vulnerable_or_safeguarding_flag = True
         db.commit()
 
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "67%" in response.text
@@ -151,7 +151,7 @@ def test_dashboard_review_compliance_full(activities_client, activities_web_engi
         )
         db.commit()
 
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "100%" in response.text
@@ -170,7 +170,7 @@ def test_dashboard_pending_proposals(activities_client, activities_web_engine):
         )
         db.commit()
 
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "Pending vocabulary proposals" in response.text
@@ -179,23 +179,25 @@ def test_dashboard_pending_proposals(activities_client, activities_web_engine):
 
 def test_dashboard_export_coverage(activities_client, activities_web_engine):
     _seed_dashboard_activities(activities_web_engine)
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "Art 30(1)" in response.text
     assert "DPA 2018 s61" in response.text
     assert "Combined internal register" in response.text
-    assert '/register/export/art30_1">Download CSV</a>' in response.text
-    assert '/register/export/combined">Download CSV</a>' in response.text
+    register = activities_client.get("/register")
+    assert '/register/export/art30_1"' in register.text
+    assert '/register/export/combined"' in register.text
 
 
 def test_dashboard_iar_export_row(activities_client, activities_web_engine):
     _seed_dashboard_activities(activities_web_engine)
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "Information Asset Register" in response.text
-    assert '/assets/export.csv">Download CSV</a>' in response.text
+    register = activities_client.get("/register")
+    assert '/assets/export.csv"' in register.text
 
 
 def test_dashboard_asset_kpis(activities_client, activities_web_engine):
@@ -218,7 +220,7 @@ def test_dashboard_asset_kpis(activities_client, activities_web_engine):
             ]
         )
         db.commit()
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert '/assets?contains_personal_data=true">1</a>' in response.text
@@ -229,7 +231,7 @@ def test_dashboard_asset_kpis(activities_client, activities_web_engine):
 def test_dashboard_no_commencement_watch_card_without_data(
     activities_client, activities_web_engine
 ):
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "DUAA commencement" not in response.text
@@ -246,7 +248,7 @@ def test_dashboard_commencement_watch_card(activities_client, activities_web_eng
         }
         db.commit()
 
-    _login(activities_client, activities_web_engine, "Vic Viewer")
+    _login(activities_client, activities_web_engine, "Ada Approver")
     response = activities_client.get("/")
     assert response.status_code == 200
     assert "DUAA commencement" in response.text
@@ -303,3 +305,149 @@ def test_mark_reviewed_removes_activity_from_overdue_dashboard(
 
     after = activities_client.get("/")
     assert "Overdue Review Activity" not in after.text
+
+
+# --- role-shaped dashboard -------------------------------------------------
+
+def _start_intake(client, engine, name="Home fire safety visits"):
+    from test_intake import _start
+
+    return _start(client, engine, name=name)
+
+
+def test_sections_for_role_membership():
+    from cairn.dashboard import sections_for_role
+    from cairn.models import Role
+
+    contributor = sections_for_role(Role.CONTRIBUTOR)
+    viewer = sections_for_role(Role.VIEWER)
+    curator = sections_for_role(Role.CURATOR)
+    approver = sections_for_role(Role.APPROVER_DPO)
+
+    assert contributor == {"your_intake"}
+    assert "register_overview" in viewer and "attention" not in viewer
+    assert "attention" in curator and "assurance" not in curator
+    assert "assurance" in approver and "commencement" in approver
+    assert viewer < curator < approver
+
+
+def test_contributor_dashboard_shows_own_work_only(activities_client, activities_web_engine):
+    _seed_dashboard_activities(activities_web_engine)
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Review compliance" not in response.text
+    assert "DUAA commencement" not in response.text
+    assert "Register overview" not in response.text
+    assert "blocking" not in response.text
+    assert "Describe an activity" in response.text
+
+
+def test_contributor_dashboard_does_not_run_the_rules_engine(
+    activities_client, activities_web_engine, monkeypatch
+):
+    _seed_dashboard_activities(activities_web_engine)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("rules engine must not run for a contributor")
+
+    monkeypatch.setattr("cairn.dashboard.evaluate", _boom)
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    assert activities_client.get("/").status_code == 200
+
+
+def test_contributor_sees_own_submissions_not_others(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    _start_intake(activities_client, activities_web_engine, name="Cody's own intake")
+    activities_client.post("/logout", data={"csrf_token": _extract_csrf(
+        activities_client.get("/").text
+    )})
+    _login(activities_client, activities_web_engine, "Ollie OtherFunction")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Cody's own intake" not in response.text
+
+
+def test_contributor_empty_state_points_at_describe_actions(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "not started" in response.text.lower()
+    assert "/intake/new" in response.text
+    assert "/intake/assets/new" in response.text
+
+
+def test_contributor_in_progress_submission_is_listed_and_resumable(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    submission_id = _start_intake(
+        activities_client, activities_web_engine, name="Resume me"
+    )
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Resume me" in response.text
+    assert f"/intake/{submission_id}" in response.text
+
+
+def test_viewer_sees_the_record_but_no_work_queues(
+    activities_client, activities_web_engine
+):
+    _seed_dashboard_activities(activities_web_engine)
+    _login(activities_client, activities_web_engine, "Vic Viewer")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Register overview" in response.text
+    assert "Overdue reviews" in response.text
+    assert "Review compliance" not in response.text
+    assert "Needs your attention" not in response.text
+    assert "DUAA commencement" not in response.text
+
+
+def test_curator_sees_attention_block_without_assurance(
+    activities_client, activities_web_engine
+):
+    from cairn.models import InformationAsset
+
+    with Session(activities_web_engine) as db:
+        db.add(
+            InformationAsset(
+                label="Proposed Asset",
+                asset_type="system",
+                entry_status=EntryStatus.PROPOSED,
+            )
+        )
+        db.commit()
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Needs your attention" in response.text
+    assert "Information assets awaiting approval" in response.text
+    assert "Review compliance" not in response.text
+
+
+def test_curator_attention_counts_render_zero_rather_than_vanishing(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    marker = ">Information assets awaiting approval</td>"
+    start = response.text.index(marker) + len(marker)
+    assert ">0<" in response.text[start : start + 200]
+
+
+def test_dashboard_no_longer_offers_csv_downloads(
+    activities_client, activities_web_engine
+):
+    _seed_dashboard_activities(activities_web_engine)
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert "Download CSV" not in response.text
+    assert "Art 30(1)" in response.text
+    assert 'href="/register"' in response.text

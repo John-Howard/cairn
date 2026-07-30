@@ -39,6 +39,50 @@
 </form>
 {% endif %}
 
+{% if intake %}
+<h2 class="govuk-heading-m">Created from intake</h2>
+<p class="govuk-body">
+  This asset was created from an intake submission by {{ intake.submission.respondent.display_name }}{% if intake.submission.respondent_contact %} ({{ intake.submission.respondent_contact }}){% endif %}.
+  <a class="govuk-link" href="/intake/{{ intake.submission.id }}">View the full submission</a>.
+</p>
+
+{% if intake.open_gaps %}
+<div class="govuk-warning-text">
+  <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+  <strong class="govuk-warning-text__text">
+    <span class="govuk-visually-hidden">Warning</span>
+    Open gaps from intake, still unanswered:
+    <ul class="govuk-list govuk-!-margin-bottom-0">
+      {% for gap in intake.open_gaps %}
+      <li>{{ gap.question_code }} — {{ gap.question_text }}</li>
+      {% endfor %}
+    </ul>
+  </strong>
+</div>
+{% endif %}
+
+<details class="govuk-details" data-module="govuk-details">
+  <summary class="govuk-details__summary">
+    <span class="govuk-details__summary-text">Intake answers</span>
+  </summary>
+  <div class="govuk-details__text">
+    {% set ns = namespace(current="") %}
+    {% for q in intake.questions %}
+    {% if q.section != ns.current %}
+    {% set ns.current = q.section %}
+    <h3 class="govuk-heading-s govuk-!-margin-top-4">{{ q.section_title }}</h3>
+    {% endif %}
+    <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-0">
+      <div class="govuk-summary-list__row">
+        <dt class="govuk-summary-list__key govuk-!-width-two-thirds">{{ q.text }}</dt>
+        <dd class="govuk-summary-list__value">{{ intake.display[q.code] }}</dd>
+      </div>
+    </dl>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+
 <h2 class="govuk-heading-m">Details</h2>
 <dl class="govuk-summary-list">
   {% for row in detail_rows %}

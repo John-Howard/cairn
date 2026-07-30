@@ -1,6 +1,6 @@
 # Cairn — Slice 2i Plan: Asset Intake Wizard
 
-**Status:** v0.1 — for iteration; the plan-and-spec treatment for backlog item 25 (marked next build slice 2026-07-28).
+**Status:** v0.1 — **built (2026-07-30), closing backlog item 25.** All three sub-slices (§5) are on `main` (or, for 2i.3, its review branch): the `question_set` generalisation and reseed mechanics (2i.1); the `/intake/assets` wizard, populates handlers and seeded *Cairn IAR Question Set v0.1* (`Cairn-iar-questions.md`, 2i.2); and gaps-queue/asset-detail curation surfacing (2i.3, below). §7's open questions are resolved as noted there.
 **Derives from:** *IAR Plan* v0.1 §5.3/§7 (the capture route and slice definition), *Intake & Pilot Plan* v0.1 (the intake-in-Cairn pattern this reuses), *Information Audit Question Set* v0.1 (the content precedent), backlog items 7/8 (reseed mechanics and question-set admin, both served by the generalisation here).
 **What 2i delivers:** a guided, jargon-free intake wizard through which asset owners across the organisation describe the information assets their teams hold — producing **proposed `InformationAsset` records**, vocabulary proposals and explicit gap records for curator follow-up, exactly as the activity intake wizard does for processing activities.
 
@@ -47,10 +47,10 @@ The intake tables currently assume a single question set. Changes, in one forwar
 - **RBAC:** same as activity intake — contributors and above run it, scoped to their function; curators/DPO see all submissions.
 - **No new engine rules.** Rule 22 already provides the follow-through signal once assets are approved.
 
-### 2.3 Curation surfacing (2i.3)
+### 2.3 Curation surfacing (2i.3) — built
 
-- The **gaps queue** (`/intake/gaps`) shows asset gaps alongside activity gaps, linking to the asset.
-- The **asset detail page** shows "created from intake" with the submission's answers and open gaps (the asset counterpart of backlog item 12 — done for assets first, deliberately).
+- The **gaps queue** (`/intake/gaps`) shows asset gaps alongside activity gaps: each card names which question set it is and links to the right record ("Draft activity" → `/activities/{id}` or "Proposed asset" → `/assets/{id}`); the resolved table's first column is the generic "Record", not "Activity"; the intro wording covers both records. One list, no separate queues, as planned — the existing resolve/reopen routes needed no change (they were already set-agnostic).
+- The **asset detail page** shows "created from intake" (the asset counterpart of backlog item 12 — done for assets first, deliberately): who the respondent was and their contact if given, a link to the full submission, the submission's answers (reusing `answer_display`/`_questions`/`_display_map` from `cairn.intake` — no second renderer), and the open gaps for that asset. Renders nothing for manually-created or CSV-imported assets.
 - Approving the proposed asset happens in the existing `/assets` register — no new approval surface.
 
 ---
@@ -96,11 +96,11 @@ To be extracted, on sign-off, into its own document (*Cairn IAR Question Set v0.
 
 Per-slice rhythm as established (branch, TDD, full suite + live drive, docs, commit on approval).
 
-| Sub-slice | Contents | Gate |
-|---|---|---|
-| **2i.1 — generalisation** | Migration (§2.1), enum, seed refactor + reseed helper, `subject_name` rename ripple | Existing activity-intake suite green, no behaviour change |
-| **2i.2 — asset wizard** | Question Set v0.1 doc extracted + seeded; `/intake/assets` routes; asset populates handlers; proposed asset + proposals + gaps on submit; nav entry | Wizard round-trip test: run → proposed asset with correct fields, gaps recorded |
-| **2i.3 — curation surfacing** | Asset gaps in the queue; "created from intake" on asset detail; pilot artefacts (P1 checklist, comms pack) and doc updates | Gap resolve/reopen against an asset; docs current |
+| Sub-slice | Contents | Gate | Status |
+|---|---|---|---|
+| **2i.1 — generalisation** | Migration (§2.1), enum, seed refactor + reseed helper, `subject_name` rename ripple | Existing activity-intake suite green, no behaviour change | **Built** |
+| **2i.2 — asset wizard** | Question Set v0.1 doc extracted + seeded; `/intake/assets` routes; asset populates handlers; proposed asset + proposals + gaps on submit; nav entry | Wizard round-trip test: run → proposed asset with correct fields, gaps recorded | **Built** |
+| **2i.3 — curation surfacing** | Asset gaps in the queue; "created from intake" on asset detail; pilot artefacts (P1 checklist, comms pack) and doc updates | Gap resolve/reopen against an asset; docs current | **Built** |
 
 ---
 
@@ -120,8 +120,11 @@ Per-slice rhythm as established (branch, TDD, full suite + live drive, docs, com
 
 **Out of scope for 2i:** question-set admin UI (backlog 8 — the generalisation enables it, evidence decides it); classification/s62 capture in the wizard (curation); asset hierarchy (IAR plan deferred list); any change to the activity question set.
 
-**Open questions:**
+**Resolved:**
 
-1. **Wave targeting** — is asset intake opened to all contributors at once or invited function-by-function alongside the audit waves? (Comms pack consequence only; the build is the same.)
-2. **Duplicate hint on the start screen** — show like-named existing assets as the respondent types the asset name, or leave dedupe wholly to curation? (Cheap to add; decide at 2i.2.)
-3. **IAO wording** — is "the senior person responsible" the right plain-English rendering of Information Asset Owner for this organisation, or is there house terminology the SIRO prefers?
+1. **Wave targeting — decided.** Asset intake is invited **function-by-function, alongside the audit waves** (`Cairn-intake-pilot-plan.md` §5) — not opened to all contributors at once. Comms-pack consequence only; the build was already the same either way (`Cairn-pilot-comms-pack.md` §3).
+2. **Duplicate hint on the start screen — built.** The like-named-asset hint (`/intake/assets/similar`, an htmx fragment against the asset label as the respondent types) shipped in 2i.2.
+
+**Still open:**
+
+3. **IAO wording.** "The senior person responsible" (AS-B2) remains the working plain-English rendering of Information Asset Owner — **provisional, no decision taken**, pending confirmation from the SIRO / Information Governance team on whether the organisation has preferred house terminology. Treat it as draft wording to sign off, not settled (see the same caveat in `Cairn-iar-questions.md` §Section B).

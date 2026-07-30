@@ -4,7 +4,7 @@
 **Tone rules (Question Set §3):** conversational, never "audit of you"; jargon-free — say *personal information*, not *personal data processing* or *Article 30*; "don't know" is explicitly welcome; shadow data (spreadsheets, inboxes, paper) is an amnesty, not a confession.
 **Placeholders:** `[SPONSOR]` chief/deputy chief fire officer or SIRO · `[IG LEAD]` name + contact · `[FUNCTION]` department · `[LINK]` the Cairn intake URL · `[DATE]` deadline · `[SESSION]` drop-in details.
 
-Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on completion.
+Send order: 1 → 2 (or 3 for asset-intake waves) → 4 (with 5 attached or linked) → 6 as needed → 7 on completion. Use 2 for activity-audit waves and 3 for asset-intake waves (`Cairn-intake-pilot-plan.md` §5, function-by-function alongside the audit) — a function invited for both sends both 2 and 3.
 
 ---
 
@@ -26,7 +26,7 @@ Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on c
 
 ## 2. Respondent invitation
 
-*From `[IG LEAD]` to each nominated respondent, after their manager has confirmed the nomination (see 3).*
+*From `[IG LEAD]` to each nominated respondent, after their manager has confirmed the nomination (see 4).*
 
 > **Subject: Your part in the information audit — about an hour, by `[DATE]`**
 >
@@ -49,7 +49,32 @@ Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on c
 >
 > `[IG LEAD]`
 
-## 3. Manager briefing note
+## 3. Asset-intake respondent invitation
+
+*From `[IG LEAD]` to each nominated respondent, for teams describing the information assets they hold rather than (or alongside) processing activities — sent instead of, or alongside, 2 depending on which wave a function is in (see usage notes).*
+
+> **Subject: Your part in the information asset register — about 15 minutes per item, by `[DATE]`**
+>
+> Hello `[NAME]`,
+>
+> Your manager has nominated you to help us record the information assets `[TEAM]` looks after — thank you for taking it on.
+>
+> **What you'll do.** Sign in at `[LINK]` with your normal work account and answer a set of plain-English questions about each *information asset* your team looks after — a system, a database, an application, or a collection of paper or physical records, e.g. "the HR system" or "the station log books". One run of the questions per asset; most teams have a handful. You'll be asked about things you already know: what it is, who looks after it day to day, whether it holds information about people, where it's kept, how it's protected, and how long things are kept. Each run takes around 15 minutes, and you can save and come back at any point.
+>
+> **What you don't need.** Any IT or data protection expertise. The questions are about what you already know, not technical detail. If you don't know an answer, tick **"Don't know — ask the IG team to follow up"** and move on: an honest "don't know" is genuinely more useful to us than a guess.
+>
+> **Three things to know:**
+> - *This covers systems and paper alike* — a shared drive, a filing cabinet, a spreadsheet and a supplier-hosted system are all information assets. If your team relies on it to hold information, it counts.
+> - *Nothing you enter is published anywhere.* Your answers create a draft register entry that the information governance team reviews before anything is finalised.
+> - *There's no blame for informal arrangements.* If something is kept in a personal drive, an inbox folder, or a cupboard rather than a proper system, tell us anyway — that's exactly what we need to know about.
+>
+> **Support.** Drop-in session `[SESSION]`, or contact me any time: `[IG LEAD CONTACT]`. Afterwards I'll book a short conversation to go through anything marked "don't know".
+>
+> Please aim to finish by **`[DATE]`**. Thank you — this genuinely matters.
+>
+> `[IG LEAD]`
+
+## 4. Manager briefing note
 
 *From `[IG LEAD]` to the head of each pilot function, before anything reaches respondents.*
 
@@ -67,7 +92,7 @@ Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on c
 >
 > `[IG LEAD]`
 
-## 4. Respondent FAQ *(attach to 2, or publish on the intranet)*
+## 5. Respondent FAQ *(attach to 2, or publish on the intranet)*
 
 > **Is this an audit of me or my team?**
 > No. Nobody's performance is being assessed. We're building a record of what the service does with personal information — a legal requirement, and the foundation for protecting it properly. Honesty helps you; it can't hurt you.
@@ -93,7 +118,7 @@ Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on c
 > **What happens afterwards?**
 > A short follow-up conversation about anything marked "don't know", then the IG team does the technical parts (legal bases, retention rules). You'll be asked to confirm the finished record matches what your team actually does — the only test that matters.
 
-## 5. Reminder *(send once, a week before `[DATE]`; chase individually after that — a second mass reminder reads as nagging)*
+## 6. Reminder *(send once, a week before `[DATE]`; chase individually after that — a second mass reminder reads as nagging)*
 
 > **Subject: Information audit — a week to go**
 >
@@ -101,7 +126,7 @@ Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on c
 >
 > `[IG LEAD]`
 
-## 6. Thank-you and what happens next
+## 7. Thank-you and what happens next
 
 *To each respondent on completion; copy their manager.*
 
@@ -123,6 +148,7 @@ Send order: 1 → 2 → 3 (with 4 attached or linked) → 5 as needed → 6 on c
 
 - **Pre-fill before inviting** (Question Set §3): create draft activities for the processing you already know about, so respondents correct rather than create. The invitation's "two to five activities" claim should be true — check before sending.
 - **Timing:** sponsor announcement ~1 week before invitations; manager note in between; `[DATE]` two to three weeks after invitations land. Drop-in in week one.
+- **Asset intake is invited function-by-function, alongside the audit waves** (decided, `Cairn-intake-pilot-plan.md` §5) — not opened to all contributors at once. Send 3 to a function's nominated asset respondent(s) on the same cadence as 2, whether that's the same wave as its activity audit or a later one; a function doing both in one wave gets both invitations.
 - **At P6 (full rollout)**, reuse this pack wave by wave with the P5 retrospective's wording fixes applied — and update the pilot-specific lines (e.g. "one of the first two areas").
 - The same pack, lightly edited, becomes the **periodic review** communications when the question set is reused at review cycles (Plan §5).
 

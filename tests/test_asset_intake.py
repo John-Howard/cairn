@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from cairn.models import (
     AssetStatus,
     AssetType,
+    AuditEvent,
     EntryStatus,
     InformationAsset,
     IntakeGap,
@@ -18,7 +19,7 @@ from cairn.models import (
     SecurityMeasure,
 )
 from conftest import business_function
-from test_activities import _login
+from test_activities import _extract_csrf, _login
 from test_intake import PREVENTION, _page_csrf
 
 ASSET_CODES = {
@@ -404,3 +405,121 @@ def test_gaps_queue_handles_asset_gap_without_crashing(activities_client, activi
     _login(client, engine, "Cara Curator")
     response = client.get("/intake/gaps")
     assert response.status_code == 200
+
+
+def test_gaps_queue_links_asset_gap_to_the_asset(activities_client, activities_web_engine):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start_asset(client, engine, name="Linked asset")
+    _save_section(client, submission_id, "C", {"AS-C1__dk": "1"})
+    asset_id = _submit(client, submission_id)
+
+    _login(client, engine, "Cara Curator")
+    page = client.get("/intake/gaps").text
+    assert f"/assets/{asset_id}" in page
+    assert f"/activities/{asset_id}" not in page
+    assert "Asset" in page
+
+
+def test_gaps_queue_intro_covers_both_records(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    page = activities_client.get("/intake/gaps").text
+    assert "proposed asset" in page.lower()
+
+
+def _submission_with_asset_gap(
+    client, engine, *, name="Gappy asset for resolve"
+) -> tuple[str, str]:
+    submission_id = _start_asset(client, engine, name=name)
+    _save_section(client, submission_id, "C", {"AS-C1__dk": "1"})
+    asset_id = _submit(client, submission_id)
+    return submission_id, asset_id
+
+
+def test_resolve_and_reopen_asset_gap(activities_client, activities_web_engine):
+    """The 2i.3 gate: gap resolve/reopen working against an asset, not just an
+    activity — the routes are set-agnostic, so this is the proof."""
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, _asset_id = _submission_with_asset_gap(client, engine)
+
+    _login(client, engine, "Cara Curator")
+    page = client.get("/intake/gaps")
+    token = _extract_csrf(page.text)
+    with Session(engine) as db:
+        gap = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "AS-C1",
+            )
+        ).one()
+        gap_id = gap.id
+
+    response = client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={
+            "csrf_token": token,
+            "resolution_note": "Confirmed by interview: holds staff records.",
+        },
+    )
+    assert response.status_code == 302
+    with Session(engine) as db:
+        gap = db.get(IntakeGap, gap_id)
+        assert gap.resolved
+        assert "Confirmed by interview" in gap.resolution_note
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_id == gap_id,
+                AuditEvent.event == "intake_gap_resolved",
+            )
+        ).all()
+        assert len(events) == 1
+
+    response = client.post(f"/intake/gaps/{gap_id}/reopen", data={"csrf_token": token})
+    assert response.status_code == 302
+    with Session(engine) as db:
+        gap = db.get(IntakeGap, gap_id)
+        assert not gap.resolved
+        assert gap.resolution_note is None
+        assert (
+            db.scalars(
+                select(AuditEvent).where(
+                    AuditEvent.entity_id == gap_id,
+                    AuditEvent.event == "intake_gap_reopened",
+                )
+            ).one()
+            is not None
+        )
+
+
+def test_asset_detail_shows_intake_section_with_answer_and_open_gap(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start_asset(client, engine, name="Intake sourced asset")
+    _save_section(client, submission_id, "B", {"AS-B1": "HR admin team", "AS-B2__dk": "1"})
+    asset_id = _submit(client, submission_id)
+
+    _login(client, engine, "Cara Curator")
+    page = client.get(f"/assets/{asset_id}").text
+    assert "Created from intake" in page
+    assert "Cody Contributor" in page
+    assert "HR admin team" in page
+    assert "AS-B2" in page
+    assert f"/intake/{submission_id}" in page
+
+
+def test_asset_detail_no_intake_section_for_manually_created_asset(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    with Session(engine) as db:
+        asset = InformationAsset(label="Manually added asset", asset_type=AssetType.SYSTEM)
+        db.add(asset)
+        db.commit()
+        asset_id = asset.id
+
+    _login(client, engine, "Cara Curator")
+    page = client.get(f"/assets/{asset_id}").text
+    assert "Created from intake" not in page

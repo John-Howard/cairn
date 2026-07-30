@@ -13,12 +13,14 @@ from cairn.audit import record_event
 from cairn.auth import current_user, get_csrf_token, verify_csrf
 from cairn.db import get_session
 from cairn.inheritance import sync_inherited_security
+from cairn.intake import submission_view
 from cairn.models import (
     AssetStatus,
     AssetType,
     BusinessFunction,
     EntryStatus,
     InformationAsset,
+    IntakeSubmission,
     LegalEntity,
     OrganisationProfile,
     ProcessingActivity,
@@ -321,6 +323,15 @@ def _gap_flags(asset: InformationAsset, linked_activity_count: int, today: date)
     if asset.next_review_date is not None and asset.next_review_date < today:
         gaps.append(f"Review was due on {asset.next_review_date} and is now overdue.")
     return gaps
+
+
+def _intake_context(session: Session, asset: InformationAsset) -> dict | None:
+    submission = session.scalars(
+        select(IntakeSubmission).where(IntakeSubmission.asset_id == asset.id)
+    ).first()
+    if submission is None:
+        return None
+    return submission_view(session, submission)
 
 
 def _linked_activities(session: Session, asset: InformationAsset) -> list[ProcessingActivity]:
@@ -636,6 +647,7 @@ def asset_detail(
             (m.id, _display_label(m)) for m in available_measures if m.id not in linked_measure_ids
         ],
         "gap_flags": _gap_flags(asset, len(linked_activities), date.today()),
+        "intake": _intake_context(session, asset),
         "csrf_token": get_csrf_token(request),
     }
     return templates.TemplateResponse(request, "assets/detail.html", context)

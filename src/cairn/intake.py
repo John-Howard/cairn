@@ -300,6 +300,21 @@ def _display_map(
     return {q.code: answer_display(session, submission, q) for q in questions}
 
 
+def submission_view(session: Session, submission: IntakeSubmission) -> dict:
+    """Questions, rendered answers and open gaps for one run — what a "created
+    from intake" panel needs. Keyed off the submission's own question set, so it
+    serves the asset panel now and the activity one when that lands."""
+    questions = _questions(session, question_set=submission.question_set)
+    return {
+        "submission": submission,
+        "questions": questions,
+        "display": _display_map(session, submission, questions),
+        "open_gaps": sorted(
+            (g for g in submission.gaps if not g.resolved), key=lambda g: g.question_code
+        ),
+    }
+
+
 def _parse_date(raw: object) -> date | None:
     if not raw or not isinstance(raw, str):
         return None

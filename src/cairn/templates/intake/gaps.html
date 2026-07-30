@@ -5,7 +5,7 @@
   <div class="govuk-grid-column-two-thirds">
     <a href="/intake" class="govuk-back-link">Back to intake</a>
     <h1 class="govuk-heading-l">Intake gaps</h1>
-    <p class="govuk-body">Every "don't know" recorded during intake, for IG follow-up. Resolve each gap after the interview or document review that answered it — record what was established, then apply the substance to the draft activity itself.</p>
+    <p class="govuk-body">Every "don't know" recorded during intake, for IG follow-up. Resolve each gap after the interview or document review that answered it — record what was established, then apply the substance to the draft activity or the proposed asset.</p>
     <p class="govuk-body"><strong class="govuk-tag {% if open_count %}govuk-tag--red{% else %}govuk-tag--green{% endif %}">{{ open_count }} open</strong></p>
   </div>
 </div>
@@ -14,11 +14,13 @@
 {% set s = group.submission %}
 <div class="govuk-summary-card">
   <div class="govuk-summary-card__title-wrapper">
-    <h2 class="govuk-summary-card__title">{{ s.subject_name }} — {{ s.business_function.label }}</h2>
+    <h2 class="govuk-summary-card__title">{{ "Asset" if s.question_set.value == "asset" else "Activity" }} intake — {{ s.subject_name }} — {{ s.business_function.label }}</h2>
     <ul class="govuk-summary-card__actions">
       <li class="govuk-summary-card__action"><a class="govuk-link" href="/intake/{{ s.id }}">Intake answers</a></li>
       {% if s.activity_id %}
       <li class="govuk-summary-card__action"><a class="govuk-link" href="/activities/{{ s.activity_id }}">Draft activity</a></li>
+      {% elif s.asset_id %}
+      <li class="govuk-summary-card__action"><a class="govuk-link" href="/assets/{{ s.asset_id }}">Proposed asset</a></li>
       {% endif %}
     </ul>
   </div>
@@ -46,7 +48,7 @@
 <table class="govuk-table">
   <thead class="govuk-table__head">
     <tr class="govuk-table__row">
-      <th scope="col" class="govuk-table__header">Activity</th>
+      <th scope="col" class="govuk-table__header">Record</th>
       <th scope="col" class="govuk-table__header">Question</th>
       <th scope="col" class="govuk-table__header">Resolution</th>
       <th scope="col" class="govuk-table__header"></th>

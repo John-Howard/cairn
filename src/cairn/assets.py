@@ -249,9 +249,21 @@ def _business_functions_label(asset: InformationAsset) -> str:
 
 def _detail_rows(session: Session, asset: InformationAsset) -> list[dict]:
     fk_maps = _fk_maps(session)
-    rows = [{"label": f.label, "value": _format_value(asset, f, fk_maps)} for f in ASSET_FIELDS]
+    rows = [
+        {
+            "label": f.label,
+            "value": _format_value(asset, f, fk_maps),
+            # Free text can hold newlines — intake writes multi-line notes.
+            "multiline": f.kind == "textarea",
+        }
+        for f in ASSET_FIELDS
+    ]
     insert_at = next((i + 1 for i, r in enumerate(rows) if r["label"] == "Custodian"), len(rows))
-    bf_row = {"label": "Business functions", "value": _business_functions_label(asset)}
+    bf_row = {
+        "label": "Business functions",
+        "value": _business_functions_label(asset),
+        "multiline": False,
+    }
     rows.insert(insert_at, bf_row)
     return rows
 

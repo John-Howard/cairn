@@ -5,6 +5,7 @@
   <title>{% block title %}Cairn{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/static/govuk/govuk-frontend-6.3.0.min.css">
+  <link rel="stylesheet" href="/static/cairn.css">
   <link rel="shortcut icon" href="/assets/images/favicon.ico" type="image/x-icon">
 </head>
 <body class="govuk-template__body">
@@ -20,7 +21,7 @@
       {% if user %}
       <div class="govuk-header__content">
         <span class="govuk-header__link">{{ user.display_name }} ({{ user.role.value }})</span>
-        <form method="post" action="/logout" style="display:inline">
+        <form method="post" action="/logout" class="cairn-inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="govuk-button govuk-button--secondary govuk-!-margin-left-2">Sign out</button>
         </form>

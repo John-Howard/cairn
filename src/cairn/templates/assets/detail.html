@@ -28,11 +28,11 @@
 </form>
 {% endif %}
 {% if can_moderate and asset.entry_status.value == "proposed" %}
-<form method="post" action="/assets/{{ asset.id }}/approve" class="govuk-!-margin-bottom-2" style="display:inline">
+<form method="post" action="/assets/{{ asset.id }}/approve" class="govuk-!-margin-bottom-2 cairn-inline-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <button type="submit" class="govuk-button govuk-button--secondary">Approve</button>
 </form>
-<form method="post" action="/assets/{{ asset.id }}/reject" style="display:inline">
+<form method="post" action="/assets/{{ asset.id }}/reject" class="cairn-inline-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="text" class="govuk-input govuk-input--width-10" name="reason" placeholder="Reason (optional)">
   <button type="submit" class="govuk-button govuk-button--warning">Reject</button>
@@ -88,7 +88,7 @@
   {% for row in detail_rows %}
   <div class="govuk-summary-list__row">
     <dt class="govuk-summary-list__key">{{ row.label }}</dt>
-    <dd class="govuk-summary-list__value">{{ row.value }}</dd>
+    <dd class="govuk-summary-list__value{% if row.multiline %} cairn-preserve-lines{% endif %}">{{ row.value }}</dd>
   </div>
   {% endfor %}
 </dl>

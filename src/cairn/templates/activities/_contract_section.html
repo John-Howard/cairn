@@ -19,7 +19,7 @@
       <td class="govuk-table__cell">
         {% if can_author_registers %}
         <a class="govuk-link" href="/activities/{{ activity.id }}/contracts/{{ contract.id }}/edit">Edit</a>
-        <form method="post" action="/activities/{{ activity.id }}/contracts/{{ contract.id }}/unlink" style="display:inline">
+        <form method="post" action="/activities/{{ activity.id }}/contracts/{{ contract.id }}/unlink" class="cairn-inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="govuk-button govuk-button--warning govuk-button--small" data-module="govuk-button">Unlink</button>
         </form>

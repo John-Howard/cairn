@@ -624,3 +624,26 @@ def test_export_csv_content_filters_and_audit_event(activities_client, activitie
             select(AuditEvent).where(AuditEvent.event == "iar_exported")
         ).all()
         assert len(events) == 2
+
+
+def test_asset_notes_preserve_stored_line_breaks(activities_client, activities_web_engine):
+    """Intake writes multi-line notes; without the class they render as one
+    run-on paragraph (the CSP rules out doing this with an inline style)."""
+    from cairn.models import AssetType, InformationAsset
+
+    with Session(activities_web_engine) as db:
+        asset = InformationAsset(
+            label="Multi-line notes asset",
+            asset_type=AssetType.SYSTEM,
+            notes="First line\nSecond line",
+        )
+        db.add(asset)
+        db.commit()
+        asset_id = asset.id
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    response = activities_client.get(f"/assets/{asset_id}")
+    assert response.status_code == 200
+    assert "cairn-preserve-lines" in response.text
+    marker = "cairn-preserve-lines\">First line"
+    assert marker in response.text

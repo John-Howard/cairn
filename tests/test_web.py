@@ -41,3 +41,35 @@ def test_js_enabled_marks_govuk_frontend_supported():
 
     css = client.get("/static/govuk/govuk-frontend-6.3.0.min.css")
     assert ".govuk-frontend-supported .govuk-radios__conditional--hidden" in css.text
+
+
+def test_cairn_stylesheet_is_served_and_linked():
+    import pathlib
+
+    client = TestClient(app)
+    css = client.get("/static/cairn.css")
+    assert css.status_code == 200
+    assert ".cairn-inline-form" in css.text
+    assert ".cairn-preserve-lines" in css.text
+
+    # Assert the link against the template source rather than a rendered page:
+    # every page needing a session hits the database, which this test has no
+    # fixture for — it would pass only where a dev database happens to exist.
+    base = pathlib.Path(__file__).resolve().parent.parent / "src" / "cairn" / "templates"
+    assert '/static/cairn.css' in (base / "base.html").read_text()
+
+
+def test_no_template_uses_an_inline_style_attribute():
+    """The CSP (default-src 'self', no style-src 'unsafe-inline') drops inline
+    style attributes, so one is always dead markup — it looks like styling but
+    computes to nothing. Anything needing styling belongs in cairn.css."""
+    import pathlib
+
+    templates = pathlib.Path(__file__).resolve().parent.parent / "src" / "cairn" / "templates"
+    offenders = [
+        f"{path.relative_to(templates)}:{n}"
+        for path in sorted(templates.rglob("*.html"))
+        for n, line in enumerate(path.read_text().splitlines(), start=1)
+        if 'style="' in line
+    ]
+    assert offenders == []

@@ -1,0 +1,43 @@
+/* Cairn-specific styling.
+ *
+ * GOV.UK Frontend does the work; this file exists only for the few cases its
+ * classes do not cover. Keep it small — a rule belongs here only when no
+ * govuk-* class achieves the same thing.
+ *
+ * Inline style attributes are not an option: the app sends
+ * Content-Security-Policy: default-src 'self' with no style-src
+ * 'unsafe-inline', so a style="..." attribute reaches the DOM and computes to
+ * nothing. Anything that needs styling must be a class in here.
+ */
+
+/* Sits a single-button <form> alongside its neighbours instead of stacking it
+ * on its own line — the common case being paired actions (approve/reject,
+ * confirm/cancel, deactivate/reactivate). */
+.cairn-inline-form {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.cairn-inline-form + .cairn-inline-form {
+  margin-left: 10px;
+}
+
+/* GOV.UK inputs are block-level and its buttons carry a bottom margin meant for
+ * stacked forms; inside an inline action row both break the alignment. */
+.cairn-inline-form .govuk-input {
+  display: inline-block;
+  width: auto;
+  vertical-align: top;
+}
+
+.cairn-inline-form .govuk-button {
+  margin-bottom: 0;
+  vertical-align: top;
+}
+
+/* Renders stored newlines in free-text fields. Intake writes multi-line notes
+ * (unmatched teams, named senior owner, respondent wording), which otherwise
+ * run together into one paragraph. */
+.cairn-preserve-lines {
+  white-space: pre-line;
+}

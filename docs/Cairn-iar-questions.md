@@ -12,6 +12,8 @@
 
 **"Don't know" is a valid answer on every question.** It's more useful than a guess — it is recorded as a gap for the IG team to follow up, exactly as in the activity intake.
 
+**Not every gap is a "don't know".** Unlike the activity set, this one also raises a gap where the respondent *did* answer but only a curator can complete the work: the named senior owner in AS-B2 always raises one (the curator binds the person to a user account), and AS-B3, AS-D2_NAME and AS-F1 raise one when the name given matches no existing business function, legal entity or retention rule. Respondents are not asked to do anything more about these — they exist so the follow-up is not silently lost at curation.
+
 **What the start screen collects, before Section A begins:**
 - which department or team this asset belongs to (business function) — the respondent's own department, becoming the asset's first linked business function;
 - who is completing this (the respondent);

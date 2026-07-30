@@ -51,7 +51,7 @@
   <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
   <strong class="govuk-warning-text__text">
     <span class="govuk-visually-hidden">Warning</span>
-    Open gaps from intake, still unanswered:
+    Open gaps from intake, still to resolve:
     <ul class="govuk-list govuk-!-margin-bottom-0">
       {% for gap in intake.open_gaps %}
       <li>{{ gap.question_code }} — {{ gap.question_text }}</li>

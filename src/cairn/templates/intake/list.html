@@ -27,7 +27,7 @@
   <tbody class="govuk-table__body">
     {% for s in submissions %}
     <tr class="govuk-table__row">
-      <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ s.id }}">{{ s.activity_name }}</a></td>
+      <td class="govuk-table__cell"><a class="govuk-link" href="/intake/{{ s.id }}">{{ s.subject_name }}</a></td>
       <td class="govuk-table__cell">{{ s.business_function.label }}</td>
       <td class="govuk-table__cell">{{ s.respondent.display_name }}</td>
       <td class="govuk-table__cell">

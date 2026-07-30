@@ -1,16 +1,17 @@
-"""FRS intake question set — Information Audit Question Set v0.1 as configuration.
+"""FRS intake question sets — seeded per question set (activity | asset).
 
 Wording, hints, ordering and options are data (Intake & Pilot Plan §2); the
-`populates` keys name field-mapping handlers in cairn.intake. Section A of the
-question set (department and respondent) is collected on the intake start screen,
-and B1/B2 (identifying and naming the activity) become the start screen's
-activity-name field — each wizard run documents one activity.
+`populates` keys name field-mapping handlers in cairn.intake. The activity set
+below is Information Audit Question Set v0.1: its Section A (department and
+respondent) is collected on the intake start screen, and B1/B2 (identifying and
+naming the activity) become the start screen's subject-name field — each wizard
+run documents one activity.
 """
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cairn.models import IntakeAnswerKind, IntakeQuestion
+from cairn.models import IntakeAnswerKind, IntakeQuestion, IntakeQuestionSet
 
 # Business functions whose respondents see Section K (Question Set §K scope).
 ENFORCEMENT_FUNCTIONS = {
@@ -258,15 +259,26 @@ DEPENDS_ON: dict[str, dict] = {
 }
 
 
-def seed_intake_questions(session: Session) -> None:
-    existing = session.scalars(select(IntakeQuestion.code)).all()
+def seed_question_set(
+    session: Session,
+    question_set: IntakeQuestionSet,
+    questions: list[tuple],
+    depends_on: dict[str, dict],
+) -> None:
+    """Seed one question set, idempotently. A no-op if that set already has rows —
+    the mechanism a later admin screen or one-off backfill (backlog 7/8) reseeds
+    through — regardless of whether the other set is populated."""
+    existing = session.scalars(
+        select(IntakeQuestion.code).where(IntakeQuestion.question_set == question_set)
+    ).all()
     if existing:
         return
-    for order, row in enumerate(QUESTIONS, start=1):
+    for order, row in enumerate(questions, start=1):
         code, section, section_title, text, hint, kind, options, populates, enforcement = row
         session.add(
             IntakeQuestion(
                 code=code,
+                question_set=question_set,
                 section=section,
                 section_title=section_title,
                 order=order,
@@ -274,9 +286,13 @@ def seed_intake_questions(session: Session) -> None:
                 hint=hint,
                 answer_kind=kind,
                 options=options,
-                depends_on=DEPENDS_ON.get(code),
+                depends_on=depends_on.get(code),
                 populates=populates,
                 enforcement_only=enforcement,
             )
         )
     session.flush()
+
+
+def seed_activity_questions(session: Session) -> None:
+    seed_question_set(session, IntakeQuestionSet.ACTIVITY, QUESTIONS, DEPENDS_ON)

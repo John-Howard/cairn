@@ -1,6 +1,6 @@
 # Cairn — Intake & Information Audit Pilot Plan
 
-**Status:** v0.1 — for iteration. Detail (durations, resourcing) deferred to future engagements. **Build status (2026-07): the pulled-forward slice (§4) is delivered on `main`** — intake wizard (`src/cairn/intake.py`, question set seeded per §2) and the gaps curation queue (`/intake/gaps`, audited resolve/reopen with resolution notes).
+**Status:** v0.1 — for iteration. Detail (durations, resourcing) deferred to future engagements. **Build status (2026-07): the pulled-forward slice (§4) is delivered on `main`** — intake wizard (`src/cairn/intake.py`, question set seeded per §2) and the gaps curation queue (`/intake/gaps`, audited resolve/reopen with resolution notes). **Addendum (2026-07-30):** a second question set now runs through the same wizard — asset intake, §5.
 **Decision recorded:** the information-audit questionnaire is **built into Cairn as its intake screen**, and the organisation-wide information audit is run **through Cairn as the pilot**. No intermediate capture tool (MS Forms / SharePoint list / Excel) is built.
 **Derives from:** *Cairn Project Plan* v0.1 (Phases 2d & 4), *Plan v0.12* §5 (workflow, hybrid authoring), *Spec v0.3* (fields), *Cairn Information Audit Question Set* v0.1 (content).
 
@@ -76,6 +76,8 @@ Intake does not require all of Phase 2. Minimum set, mapped to the Project Plan:
 | P6 | Rollout to remaining departments in waves | Complete information audit = populated ROPA |
 
 **Success measures (indicative):** % of activities entered without IG hand-holding; % of answers matched to controlled vocabularies vs proposed-new; gaps recorded vs guessed; curation time per activity; respondent feedback; and — the ICO test — spot-checks confirming records match actual practice.
+
+**Asset intake (slice 2i, 2026-07-30).** Cairn's intake wizard now carries a **second question set** alongside the one above: the *Cairn IAR Question Set v0.1* (`Cairn-iar-questions.md`), run at `/intake/assets`, producing a proposed `InformationAsset` (system, database, application, or collection of paper/physical records) instead of a draft activity — an intake-driven option for building the asset inventory, alongside the CSV bulk import already available at P1. **Decided:** asset intake is invited **function-by-function, alongside the audit waves in the table above** — not opened to all contributors at once. See `Cairn-pilot-comms-pack.md` §3 for the asset-intake invitation wording, and `Cairn-pilot-p1-seeding-checklist.md` §D for verifying both question sets are seeded before a wave starts.
 
 ---
 

@@ -1,6 +1,6 @@
 # Cairn — System Administration Reference
 
-**Status:** Admin Reference v0.3. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
+**Status:** Admin Reference v0.4. Operational companion to Environments & DevOps v0.1 (`environments-devops.md`) — that document holds the design decisions and runbook commitments; this one is the hands-on reference for starting, stopping and managing the application in each environment. Everything here describes what the repository actually does today.
 
 ---
 
@@ -34,7 +34,7 @@ uv run uvicorn cairn.web:app --reload    # start on http://127.0.0.1:8000
 
 Stop with `Ctrl-C`. Quality gates (same as CI): `uv run ruff check .` and `uv run pytest -q`.
 
-- **First run:** with an empty database, visiting `/` redirects to the `/setup` wizard, which creates the Organisation Profile, seeds the legal and FRS vocabularies (including the intake question set), and creates the bootstrap `approver_dpo` user (logged in immediately). `/setup` returns 404 once a profile exists.
+- **First run:** with an empty database, visiting `/` redirects to the `/setup` wizard, which creates the Organisation Profile, seeds the legal and FRS vocabularies (including both intake question sets — activity and asset), and creates the bootstrap `approver_dpo` user (logged in immediately). `/setup` returns 404 once a profile exists.
 - **Logging in:** `/login` lists active users; pick one (no password — dev mode only). Create further users at `/users` (approver only).
 - **Resetting dev:** stop the server, delete `cairn.db`, run `uv run alembic upgrade head`, restart and go through `/setup` again.
 
@@ -132,6 +132,7 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 | Disaster recovery | Redeploy the image on any estate + restore the latest backup; RTO ≤ 1 business day, RPO ≤ 24h |
 | Audit trail | All record changes are versioned in-app (`RecordVersion`/`AuditEvent` tables); exports, status changes, role changes and imports write audit events. The audit trail outlives the records it describes — never truncate these tables |
 | Seed / legislation updates | Ship as versioned migrations through the normal release process — never manual SQL against a live database |
+| Intake question-set backfill | `/setup` seeds **both** intake question sets (activity and asset) via `seed_frs_pack`, but it only runs once. A database seeded before the asset question set existed (slice 2i.2) has activity rows and no asset rows. Check `select count(*) from intake_question where question_set = 'asset'`; if zero, backfill with a one-off `seed_asset_questions(session)` call (`cairn.seeds`) — safe and additive, a no-op if that set's rows already exist. The equivalent activity-set check is `seed_activity_questions(session)` (backlog item 7) |
 
 ## 7. Known gaps (deliberate, tracked)
 
@@ -140,4 +141,4 @@ Cairn requests `openid profile email` with Authorization Code + PKCE; no API per
 
 ---
 
-*Admin Reference v0.3 (adds the IAR bulk-load reference to §6; v0.2 added §5 SSO/OIDC setup) — update this document whenever the start/stop/deploy mechanics change (new auth mode, entrypoint migrations, logging).*
+*Admin Reference v0.4 (covers both intake question sets and the asset-set backfill in §2/§6; v0.3 added the IAR bulk-load reference to §6; v0.2 added §5 SSO/OIDC setup) — update this document whenever the start/stop/deploy mechanics change (new auth mode, entrypoint migrations, logging).*

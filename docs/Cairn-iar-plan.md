@@ -1,7 +1,7 @@
 # Cairn — Information Asset Register (IAR) Plan
 
 **Status:** v0.1 — for iteration. Durations and resourcing deferred, consistent with Project Plan v0.3.
-**Build status (2026-07-27): slices 2g and 2h (§7) are built** — migration `538c7c1b29ab`, the `/assets` module, activity-from-asset, rules 22–23, dashboard KPIs, asset CSV import and filtered IAR export. Slice 2i (asset intake wizard) is the next build slice (marked 2026-07-28; backlog item 25).
+**Build status (2026-07-30): all three slices (§7) are built** — 2g/2h (2026-07-27): migration `538c7c1b29ab`, the `/assets` module, activity-from-asset, rules 22–23, dashboard KPIs, asset CSV import and filtered IAR export. 2i (2026-07-30): the `question_set` generalisation, the `/intake/assets` wizard producing proposed `InformationAsset` records against the *IAR Question Set v0.1* (`Cairn-iar-questions.md`), and gaps-queue/asset-detail curation surfacing — closing backlog item 25 (`Cairn-2i-asset-intake-plan.md`). All three information-asset capture routes (manual, CSV import, intake) are now complete.
 **Origin:** pre-beta discussions (2026-07) identified the need for an Information Asset Register — physical and digital assets, databases, software and paper files — alongside the ROPA, linked to ROPA records, with IAR data feeding and populating the ROPA, and with its own presentation and data-capture interface.
 **Decisions recorded (2026-07):**
 

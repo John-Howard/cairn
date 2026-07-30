@@ -4,13 +4,17 @@
 <h1 class="govuk-heading-l">Combined register</h1>
 <p class="govuk-body">All processing activities across both regimes.</p>
 
+<h2 class="govuk-heading-s">Also in registers</h2>
+<ul class="govuk-list">
+  <li><a class="govuk-link" href="/activities">Processing activities</a></li>
+  <li><a class="govuk-link" href="/assets">Information assets</a></li>
+</ul>
+
 <div class="govuk-button-group">
-  <a class="govuk-button govuk-button--secondary" href="/register/export/art30_1">Art 30(1) CSV</a>
-  <a class="govuk-button govuk-button--secondary" href="/register/export/art30_2">Art 30(2) CSV</a>
-  {% if show_s61 %}
-  <a class="govuk-button govuk-button--secondary" href="/register/export/s61">s61 CSV</a>
-  {% endif %}
-  <a class="govuk-button govuk-button--secondary" href="/register/export/combined">Combined register CSV</a>
+  {% for title, key in export_links %}
+  <a class="govuk-button govuk-button--secondary" href="/register/export/{{ key }}">{{ title }} CSV</a>
+  {% endfor %}
+  <a class="govuk-button govuk-button--secondary" href="/assets/export.csv">Information Asset Register CSV</a>
 </div>
 
 <table class="govuk-table">

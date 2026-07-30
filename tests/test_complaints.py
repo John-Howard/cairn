@@ -297,10 +297,12 @@ def _nav_html(html: str) -> str:
 def test_nav_link_visible_for_curator_absent_for_viewer(
     activities_client, activities_web_engine
 ):
+    # Complaints now lives under the site-wide "Review" section (Review is
+    # role-gated the same way the old flat dashboard nav gated /complaints).
     _login(activities_client, activities_web_engine, "Cara Curator")
     home = activities_client.get("/")
-    assert 'href="/complaints"' in _nav_html(home.text)
+    assert 'href="/review"' in _nav_html(home.text)
 
     _login(activities_client, activities_web_engine, "Vic Viewer")
     home = activities_client.get("/")
-    assert 'href="/complaints"' not in _nav_html(home.text)
+    assert 'href="/review"' not in _nav_html(home.text)

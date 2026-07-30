@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Add information{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Add information</h1>
+<p class="govuk-body">Ways to bring a new activity, asset or bulk dataset into Cairn.</p>
+
+<dl class="govuk-summary-list">
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/intake/new">Describe an activity</a></dt>
+    <dd class="govuk-summary-list__value">Answer plain-English questions about one thing your team does with information about people.</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/intake/assets/new">Describe an information asset</a></dt>
+    <dd class="govuk-summary-list__value">Answer plain-English questions about one system, database, application or collection of records.</dd>
+  </div>
+  <div class="govuk-summary-list__row{% if not can_curate %} govuk-summary-list__row--no-border{% endif %}">
+    <dt class="govuk-summary-list__key">
+      <a class="govuk-link" href="/intake">{% if can_curate %}All submissions{% else %}My submissions{% endif %}</a>
+    </dt>
+    <dd class="govuk-summary-list__value">
+      {% if can_curate %}Intake runs anyone has started or completed.{% else %}Intake runs you have started or completed.{% endif %}
+    </dd>
+  </div>
+  {% if can_curate %}
+  <div class="govuk-summary-list__row govuk-summary-list__row--no-border">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/imports">Import a spreadsheet</a></dt>
+    <dd class="govuk-summary-list__value">Bulk-load activities from a questionnaire export, or assets from a CSV.</dd>
+  </div>
+  {% endif %}
+</dl>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Review{% endblock %}
+{% block content %}
+<h1 class="govuk-heading-l">Review</h1>
+<p class="govuk-body">Curation queues: facts recorded at intake that need a follow-up, and proposed reference data waiting for a decision.</p>
+
+<dl class="govuk-summary-list">
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/intake/gaps">Follow-up gaps</a></dt>
+    <dd class="govuk-summary-list__value">Every "don't know" recorded during intake.</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/vocabularies">Reference data awaiting approval</a></dt>
+    <dd class="govuk-summary-list__value">New data subjects, categories, recipients and other reference values proposed from intake or import.</dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/assets">Information assets awaiting approval</a></dt>
+    <dd class="govuk-summary-list__value">Assets awaiting a decision carry a "Proposed" tag in the register — look for it in the list.</dd>
+  </div>
+  <div class="govuk-summary-list__row govuk-summary-list__row--no-border">
+    <dt class="govuk-summary-list__key"><a class="govuk-link" href="/complaints">Complaints</a></dt>
+    <dd class="govuk-summary-list__value">Statutory complaints handling and response deadlines.</dd>
+  </div>
+</dl>
+{% endblock %}

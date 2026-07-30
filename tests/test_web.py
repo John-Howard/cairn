@@ -44,14 +44,19 @@ def test_js_enabled_marks_govuk_frontend_supported():
 
 
 def test_cairn_stylesheet_is_served_and_linked():
+    import pathlib
+
     client = TestClient(app)
     css = client.get("/static/cairn.css")
     assert css.status_code == 200
     assert ".cairn-inline-form" in css.text
     assert ".cairn-preserve-lines" in css.text
 
-    page = client.get("/login")
-    assert '/static/cairn.css' in page.text
+    # Assert the link against the template source rather than a rendered page:
+    # every page needing a session hits the database, which this test has no
+    # fixture for — it would pass only where a dev database happens to exist.
+    base = pathlib.Path(__file__).resolve().parent.parent / "src" / "cairn" / "templates"
+    assert '/static/cairn.css' in (base / "base.html").read_text()
 
 
 def test_no_template_uses_an_inline_style_attribute():

@@ -38,6 +38,7 @@ from cairn.models import (
     IntakeStatus,
     IntakeSubmission,
     LegalEntity,
+    LegalEntityRoleType,
     LifecycleStage,
     PersonalDataCategory,
     ProcessingActivity,
@@ -261,6 +262,15 @@ def _vocab_selection(
 
 def _yes(submission: IntakeSubmission, code: str) -> bool:
     return _value(submission, code) == "yes"
+
+
+def _match_legal_entity(session: Session, name: str) -> LegalEntity | None:
+    entities = {
+        le.label.lower(): le
+        for le in session.scalars(select(LegalEntity)).all()
+        if le.entry_status != EntryStatus.REJECTED
+    }
+    return entities.get(name.lower())
 
 
 def answer_display(
@@ -526,14 +536,24 @@ def apply_asset_submission(
     if what_it_holds:
         notes.append(f"What it holds (respondent's words): {what_it_holds}")
 
+    proposals: dict[str, list[str]] = {}
+
     supplier_name = _value(submission, "AS-D2_NAME")
     if supplier_name:
-        suppliers = {le.label.lower(): le for le in session.scalars(select(LegalEntity)).all()}
-        supplier = suppliers.get(supplier_name.lower())
+        supplier = _match_legal_entity(session, supplier_name)
         if supplier is not None:
             asset.supplier_entity_id = supplier.id
         else:
-            notes.append(f"Named supplier (not matched): {supplier_name}")
+            supplier = LegalEntity(
+                label=supplier_name,
+                role_type=LegalEntityRoleType.PROCESSOR,
+                entry_status=EntryStatus.PROPOSED,
+            )
+            session.add(supplier)
+            session.flush()
+            asset.supplier_entity_id = supplier.id
+            proposals.setdefault("legal_entities", []).append(supplier_name)
+            notes.append(f"Named supplier proposed as a new reference entry: {supplier_name}")
             add_gap("AS-D2_NAME")
 
     retention_name = _value(submission, "AS-F1")
@@ -550,7 +570,6 @@ def apply_asset_submission(
             notes.append(f"Stated retention (not matched to a rule): {retention_name}")
             add_gap("AS-F1")
 
-    proposals: dict[str, list[str]] = {}
     entries, new_names = _vocab_selection(session, submission, "AS-E1", "security_measures")
     for entry in entries:
         if entry not in asset.security_measures:
@@ -1094,6 +1113,10 @@ def intake_review(
         _entries, new_names = _vocab_selection(session, submission, code, vocab_key)
         if new_names:
             proposals[vocab_key] = new_names
+    if submission.question_set == IntakeQuestionSet.ASSET:
+        supplier_name = _value(submission, "AS-D2_NAME")
+        if supplier_name and _match_legal_entity(session, supplier_name) is None:
+            proposals.setdefault("legal_entities", []).append(supplier_name)
     dont_know_codes = [
         q.code
         for q in questions

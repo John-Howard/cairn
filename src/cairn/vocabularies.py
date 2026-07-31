@@ -153,6 +153,7 @@ VOCABULARIES: dict[str, VocabSpec] = {
             model=LegalEntity,
             display_name="Legal entity",
             label_attr="label",
+            accepts_proposals=True,
             fields=[
                 VocabField("label", "Label", "text", required=True),
                 VocabField(

@@ -84,7 +84,7 @@ To be extracted, on sign-off, into its own document (*Cairn IAR Question Set v0.
 | AS-C1 | C — The information it holds | Does it hold information about people? | Staff, the public, anyone — however routine | yes_no | `contains_personal_data` |
 | AS-C2 | C *(if C1 = yes)* | Roughly what information about people does it hold? | Names and contact details? Health information? Photographs or recordings? | textarea | `notes` (curation context) |
 | AS-D1 | D — Where it is | Where is it kept? | A building or room for paper; a supplier, data centre or "the cloud" for systems | text | `location` |
-| AS-D2 | D | Is it provided or hosted by an outside company? Which one? | | text | supplier match → `supplier_entity_id`, else `notes` + gap |
+| AS-D2 | D | Is it provided or hosted by an outside company? Which one? | | text | supplier match → `supplier_entity_id`, else proposed `LegalEntity` (processor) linked + `notes` + gap |
 | AS-D3 | D *(if D2 answered)* | Is any of the information kept outside the UK? Where? | | text | `hosting_country` |
 | AS-E1 | E — How it's protected | How is it protected? | Locked rooms or cabinets, passwords, restricted access, encryption — pick all that apply or suggest new ones | vocab_multi (security measures) | `security_measures` (+ proposals) |
 | AS-F1 | F — Keeping and disposing | How long is the information kept, and is that written down anywhere? | | text | retention match → `default_retention_id`, else `notes` + gap |

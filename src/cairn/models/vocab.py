@@ -23,7 +23,7 @@ class ProposableMixin:
     entry_status: Mapped[EntryStatus] = mapped_column(default=EntryStatus.APPROVED)
 
 
-class LegalEntity(AuditedBase):
+class LegalEntity(ProposableMixin, AuditedBase):
     __tablename__ = "legal_entity"
 
     label: Mapped[str]

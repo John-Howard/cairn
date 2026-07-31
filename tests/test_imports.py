@@ -582,6 +582,7 @@ def test_asset_happy_path_confirm_creates_assets(activities_client, activities_w
     preview = activities_client.get(f"/imports/assets/{batch_id}")
     assert preview.status_code == 200
     assert "Case Management System" in preview.text
+    assert "will be created as proposed" not in preview.text
 
     confirm_token = _extract_csrf(preview.text)
     confirm = _asset_confirm(activities_client, batch_id, confirm_token)
@@ -634,6 +635,7 @@ def test_asset_unmatched_iao_function_supplier_retention_warnings(
     assert "Unknown business function" in preview.text
     assert "Unknown supplier" in preview.text
     assert "Unknown retention rule" in preview.text
+    assert "will be created as proposed" in preview.text
 
     confirm_token = _extract_csrf(preview.text)
     confirm = _asset_confirm(activities_client, batch_id, confirm_token)
@@ -646,6 +648,7 @@ def test_asset_unmatched_iao_function_supplier_retention_warnings(
         assert asset.iao_user_id is None
         assert asset.business_functions == []
         assert asset.default_retention_id is None
+        assert asset.entry_status == EntryStatus.PROPOSED
         supplier = db.get(LegalEntity, asset.supplier_entity_id)
         assert supplier.label == "Not A Real Supplier"
         assert supplier.entry_status == EntryStatus.PROPOSED
@@ -672,6 +675,7 @@ def test_asset_unmatched_supplier_becomes_proposed_legal_entity(
     batch_id = upload.headers["location"].removeprefix("/imports/assets/")
     preview = activities_client.get(f"/imports/assets/{batch_id}")
     assert "will be proposed as a new legal entity" in preview.text
+    assert "will be created as proposed" in preview.text
 
     confirm_token = _extract_csrf(preview.text)
     confirm = _asset_confirm(activities_client, batch_id, confirm_token)
@@ -687,6 +691,7 @@ def test_asset_unmatched_supplier_becomes_proposed_legal_entity(
             select(InformationAsset).where(InformationAsset.label == "Supplier Proposal Asset")
         ).one()
         assert asset.supplier_entity_id == supplier.id
+        assert asset.entry_status == EntryStatus.PROPOSED
 
         events = db.scalars(
             select(AuditEvent).where(AuditEvent.event == "asset_import_confirmed")
@@ -818,6 +823,51 @@ def test_asset_supplier_matching_rejected_legal_entity_is_row_error(
         assert matches == []
 
 
+def test_asset_supplier_matching_proposed_legal_entity_is_row_proposed(
+    activities_client, activities_web_engine
+):
+    with Session(activities_web_engine) as db:
+        db.add(
+            LegalEntity(
+                label="Pending Supplier Ltd",
+                role_type=LegalEntityRoleType.PROCESSOR,
+                entry_status=EntryStatus.PROPOSED,
+            )
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Pending Supplier Asset",
+                "asset_type": "system",
+                "supplier": "Pending Supplier Ltd",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "will be created as proposed" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Pending Supplier Asset")
+        ).one()
+        assert asset.entry_status == EntryStatus.PROPOSED
+        supplier = db.get(LegalEntity, asset.supplier_entity_id)
+        assert supplier.label == "Pending Supplier Ltd"
+        assert supplier.entry_status == EntryStatus.PROPOSED
+
+
 def test_asset_duplicate_row_with_unknown_supplier_proposes_nothing(
     activities_client, activities_web_engine
 ):
@@ -841,6 +891,7 @@ def test_asset_duplicate_row_with_unknown_supplier_proposes_nothing(
     )
     batch_id = upload.headers["location"].removeprefix("/imports/assets/")
     preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "will be created as proposed" not in preview.text
     confirm_token = _extract_csrf(preview.text)
     confirm = _asset_confirm(activities_client, batch_id, confirm_token)
     assert confirm.status_code == 302
@@ -1055,6 +1106,7 @@ def test_asset_security_measures_unmatched_become_proposals(
     batch_id = upload.headers["location"].removeprefix("/imports/assets/")
     preview = activities_client.get(f"/imports/assets/{batch_id}")
     assert "brand new control" in preview.text
+    assert "will be created as proposed" in preview.text
 
     confirm_token = _extract_csrf(preview.text)
     confirm = _asset_confirm(activities_client, batch_id, confirm_token)
@@ -1069,6 +1121,7 @@ def test_asset_security_measures_unmatched_become_proposals(
             select(InformationAsset).where(InformationAsset.label == "Proposal Source Asset")
         ).one()
         assert measure in asset.security_measures
+        assert asset.entry_status == EntryStatus.PROPOSED
 
 
 def test_asset_import_permissions(activities_client, activities_web_engine):

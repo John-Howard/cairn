@@ -615,6 +615,37 @@ def apply_asset_submission(
     return asset
 
 
+def resolve_supplier_gaps(
+    session: Session, entity: LegalEntity, actor: User
+) -> list[IntakeGap]:
+    """Auto-resolve AS-D2_NAME gaps for assets whose supplier proposal was just approved."""
+    gaps = session.scalars(
+        select(IntakeGap)
+        .join(InformationAsset, IntakeGap.asset_id == InformationAsset.id)
+        .where(
+            IntakeGap.resolved.is_(False),
+            IntakeGap.question_code == "AS-D2_NAME",
+            InformationAsset.supplier_entity_id == entity.id,
+        )
+    ).all()
+    note = f"Resolved automatically: supplier '{entity.label}' was approved as a legal entity."
+    for gap in gaps:
+        gap.resolved = True
+        gap.resolution_note = note
+        gap.change_note = "Gap resolved"
+    session.flush()
+    for gap in gaps:
+        record_event(
+            session,
+            entity=gap,
+            event="intake_gap_resolved",
+            actor=actor,
+            reason=note,
+            new_value={"question_code": gap.question_code, "submission": gap.submission_id},
+        )
+    return gaps
+
+
 def _base_context(request: Request, user: User) -> dict:
     return {"user": user, "csrf_token": get_csrf_token(request)}
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from cairn.audit import record_event
 from cairn.auth import current_user, get_csrf_token, verify_csrf
 from cairn.db import get_session
+from cairn.intake import resolve_supplier_gaps
 from cairn.models import (
     AdequacyStatus,
     APDScope,
@@ -716,6 +717,8 @@ async def vocab_approve(
     entity.change_note = "Proposal approved"
     session.flush()
     record_event(session, entity=entity, event="vocab_approved", actor=user)
+    if isinstance(entity, LegalEntity):
+        resolve_supplier_gaps(session, entity, user)
     return RedirectResponse(f"/vocabularies/{key}", status_code=302)
 
 

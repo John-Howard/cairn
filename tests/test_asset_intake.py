@@ -22,6 +22,7 @@ from cairn.models import (
 from conftest import business_function
 from test_activities import _extract_csrf, _login
 from test_intake import PREVENTION, _page_csrf
+from test_vocabularies import _vocab_token
 
 ASSET_CODES = {
     "AS-A1", "AS-A2", "AS-A3",
@@ -642,3 +643,257 @@ def test_gaps_queue_does_not_describe_gaps_as_only_dont_knows(
     page = client.get("/intake/gaps").text
     assert "AS-B2" in page
     assert "Every \"don't know\"" not in page
+
+
+def _submission_with_unmatched_supplier(
+    client, engine, *, name, supplier_name
+) -> tuple[str, str]:
+    submission_id = _start_asset(client, engine, name=name)
+    _save_section(
+        client, submission_id, "D",
+        {"AS-D1": "Somewhere", "AS-D2": "yes", "AS-D2_NAME": supplier_name},
+    )
+    asset_id = _submit(client, submission_id)
+    return submission_id, asset_id
+
+
+def _approve_legal_entity(client, entity_id: str):
+    token = _vocab_token(client)
+    return client.post(
+        f"/vocabularies/legal-entities/{entity_id}/approve", data={"csrf_token": token}
+    )
+
+
+def _reject_legal_entity(client, entity_id: str):
+    token = _vocab_token(client)
+    return client.post(
+        f"/vocabularies/legal-entities/{entity_id}/reject",
+        data={"csrf_token": token, "reason": "Not a genuine supplier"},
+    )
+
+
+def test_approving_proposed_supplier_resolves_the_gap(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, asset_id = _submission_with_unmatched_supplier(
+        client, engine, name="Supplier gap asset", supplier_name="Auto Resolve Co"
+    )
+
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        supplier_id = asset.supplier_entity_id
+
+    _login(client, engine, "Cara Curator")
+    response = _approve_legal_entity(client, supplier_id)
+    assert response.status_code == 302
+
+    with Session(engine) as db:
+        gap = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "AS-D2_NAME",
+            )
+        ).one()
+        assert gap.resolved
+        assert gap.resolution_note
+        assert "Auto Resolve Co" in gap.resolution_note
+
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_id == gap.id,
+                AuditEvent.event == "intake_gap_resolved",
+            )
+        ).all()
+        assert len(events) == 1
+
+
+def test_gaps_queue_shows_auto_resolved_supplier_gap_in_resolved_section(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    _submission_id, asset_id = _submission_with_unmatched_supplier(
+        client, engine, name="Queue supplier gap asset", supplier_name="Queue Resolve Co"
+    )
+
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        supplier_id = asset.supplier_entity_id
+
+    _login(client, engine, "Cara Curator")
+    _approve_legal_entity(client, supplier_id)
+
+    page = client.get("/intake/gaps").text
+    assert "AS-D2_NAME" in page
+    resolved_section = page.split("Resolved</h2>")[-1]
+    assert "Queue Resolve Co" in resolved_section
+    open_groups_section = page.split("Resolved</h2>")[0]
+    assert "AS-D2_NAME" not in open_groups_section
+
+
+def test_rejecting_proposed_supplier_leaves_gap_open(activities_client, activities_web_engine):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, asset_id = _submission_with_unmatched_supplier(
+        client, engine, name="Rejected supplier gap asset", supplier_name="Reject Me Co"
+    )
+
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        supplier_id = asset.supplier_entity_id
+
+    _login(client, engine, "Cara Curator")
+    response = _reject_legal_entity(client, supplier_id)
+    assert response.status_code == 302
+
+    with Session(engine) as db:
+        gap = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "AS-D2_NAME",
+            )
+        ).one()
+        assert not gap.resolved
+        assert gap.resolution_note is None
+
+
+def test_approving_unreferenced_legal_entity_resolves_nothing(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    with Session(engine) as db:
+        entity = LegalEntity(
+            label="Standalone Proposed Entity",
+            role_type=LegalEntityRoleType.PROCESSOR,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        db.add(entity)
+        db.commit()
+        entity_id = entity.id
+
+    _login(client, engine, "Cara Curator")
+    response = _approve_legal_entity(client, entity_id)
+    assert response.status_code == 302
+
+    with Session(engine) as db:
+        events = db.scalars(
+            select(AuditEvent).where(AuditEvent.event == "intake_gap_resolved")
+        ).all()
+        assert events == []
+
+
+def test_approving_supplier_resolves_only_the_matching_assets_gap(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_a, asset_a_id = _submission_with_unmatched_supplier(
+        client, engine, name="Asset A", supplier_name="Supplier A Ltd"
+    )
+    submission_b, asset_b_id = _submission_with_unmatched_supplier(
+        client, engine, name="Asset B", supplier_name="Supplier B Ltd"
+    )
+
+    with Session(engine) as db:
+        supplier_a_id = db.get(InformationAsset, asset_a_id).supplier_entity_id
+
+    _login(client, engine, "Cara Curator")
+    _approve_legal_entity(client, supplier_a_id)
+
+    with Session(engine) as db:
+        gap_a = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_a,
+                IntakeGap.question_code == "AS-D2_NAME",
+            )
+        ).one()
+        gap_b = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_b,
+                IntakeGap.question_code == "AS-D2_NAME",
+            )
+        ).one()
+        assert gap_a.resolved
+        assert not gap_b.resolved
+        assert gap_b.resolution_note is None
+
+
+def test_already_resolved_supplier_gap_is_not_re_resolved(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id, asset_id = _submission_with_unmatched_supplier(
+        client, engine, name="Manually resolved gap asset", supplier_name="Manual Resolve Co"
+    )
+
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        supplier_id = asset.supplier_entity_id
+        gap_id = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "AS-D2_NAME",
+            )
+        ).one().id
+
+    _login(client, engine, "Cara Curator")
+    token = _extract_csrf(client.get("/intake/gaps").text)
+    client.post(
+        f"/intake/gaps/{gap_id}/resolve",
+        data={"csrf_token": token, "resolution_note": "Confirmed manually before approval."},
+    )
+
+    _approve_legal_entity(client, supplier_id)
+
+    with Session(engine) as db:
+        gap = db.get(IntakeGap, gap_id)
+        assert gap.resolved
+        assert gap.resolution_note == "Confirmed manually before approval."
+
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.entity_id == gap_id,
+                AuditEvent.event == "intake_gap_resolved",
+            )
+        ).all()
+        assert len(events) == 1
+
+
+def test_approving_supplier_leaves_other_question_gap_on_same_asset_open(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start_asset(client, engine, name="Multi gap asset")
+    _save_section(client, submission_id, "B", {"AS-B2": "Jo Smith, Head of HR"})
+    _save_section(
+        client, submission_id, "D",
+        {"AS-D1": "Somewhere", "AS-D2": "yes", "AS-D2_NAME": "Multi Gap Supplier Ltd"},
+    )
+    asset_id = _submit(client, submission_id)
+
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        supplier_id = asset.supplier_entity_id
+
+    _login(client, engine, "Cara Curator")
+    _approve_legal_entity(client, supplier_id)
+
+    with Session(engine) as db:
+        owner_gap = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "AS-B2",
+            )
+        ).one()
+        supplier_gap = db.scalars(
+            select(IntakeGap).where(
+                IntakeGap.submission_id == submission_id,
+                IntakeGap.question_code == "AS-D2_NAME",
+            )
+        ).one()
+        assert not owner_gap.resolved
+        assert supplier_gap.resolved

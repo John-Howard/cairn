@@ -12,6 +12,8 @@ from cairn.models import (
     ImportBatch,
     ImportBatchStatus,
     InformationAsset,
+    LegalEntity,
+    LegalEntityRoleType,
     ProcessingActivity,
     Recipient,
     RecipientType,
@@ -643,8 +645,211 @@ def test_asset_unmatched_iao_function_supplier_retention_warnings(
         ).one()
         assert asset.iao_user_id is None
         assert asset.business_functions == []
-        assert asset.supplier_entity_id is None
         assert asset.default_retention_id is None
+        supplier = db.get(LegalEntity, asset.supplier_entity_id)
+        assert supplier.label == "Not A Real Supplier"
+        assert supplier.entry_status == EntryStatus.PROPOSED
+        assert supplier.role_type == LegalEntityRoleType.PROCESSOR
+
+
+def test_asset_unmatched_supplier_becomes_proposed_legal_entity(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Supplier Proposal Asset",
+                "asset_type": "system",
+                "supplier": "Nonexistent Supplier Co",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "will be proposed as a new legal entity" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        supplier = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Nonexistent Supplier Co")
+        ).one()
+        assert supplier.entry_status == EntryStatus.PROPOSED
+        assert supplier.role_type == LegalEntityRoleType.PROCESSOR
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Supplier Proposal Asset")
+        ).one()
+        assert asset.supplier_entity_id == supplier.id
+
+        events = db.scalars(
+            select(AuditEvent).where(AuditEvent.event == "asset_import_confirmed")
+        ).one()
+        assert supplier.id in events.new_value["proposals"]
+
+
+def test_asset_duplicate_supplier_name_different_casing_dedupes(
+    activities_client, activities_web_engine
+):
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Casing Asset One",
+                "asset_type": "system",
+                "supplier": "new supplier co",
+            },
+            {
+                "label": "Casing Asset Two",
+                "asset_type": "system",
+                "supplier": "New Supplier Co",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        suppliers = db.scalars(
+            select(LegalEntity).where(LegalEntity.label.ilike("new supplier co"))
+        ).all()
+        assert len(suppliers) == 1
+        supplier = suppliers[0]
+        asset_one = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Casing Asset One")
+        ).one()
+        asset_two = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Casing Asset Two")
+        ).one()
+        assert asset_one.supplier_entity_id == supplier.id
+        assert asset_two.supplier_entity_id == supplier.id
+
+
+def test_asset_known_supplier_links_without_creating_new_entity(
+    activities_client, activities_web_engine
+):
+    with Session(activities_web_engine) as db:
+        db.add(LegalEntity(label="Acme Cloud Ltd", role_type=LegalEntityRoleType.PROCESSOR))
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Known Supplier Asset",
+                "asset_type": "system",
+                "supplier": "Acme Cloud Ltd",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        suppliers = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Acme Cloud Ltd")
+        ).all()
+        assert len(suppliers) == 1
+        asset = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Known Supplier Asset")
+        ).one()
+        assert asset.supplier_entity_id == suppliers[0].id
+
+
+def test_asset_supplier_matching_rejected_legal_entity_is_row_error(
+    activities_client, activities_web_engine
+):
+    with Session(activities_web_engine) as db:
+        db.add(
+            LegalEntity(
+                label="Old Supplier Ltd",
+                role_type=LegalEntityRoleType.PROCESSOR,
+                entry_status=EntryStatus.REJECTED,
+            )
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "Rejected Supplier Asset",
+                "asset_type": "system",
+                "supplier": "Old Supplier Ltd",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    assert "previously rejected" in preview.text
+
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 422
+
+    with Session(activities_web_engine) as db:
+        matches = db.scalars(
+            select(InformationAsset).where(InformationAsset.label == "Rejected Supplier Asset")
+        ).all()
+        assert matches == []
+
+
+def test_asset_duplicate_row_with_unknown_supplier_proposes_nothing(
+    activities_client, activities_web_engine
+):
+    with Session(activities_web_engine) as db:
+        db.add(InformationAsset(label="Existing Supplier Asset"))
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    token = _page_csrf(activities_client, "/imports/assets/new")
+
+    upload = _asset_upload(
+        activities_client,
+        token,
+        [
+            {
+                "label": "existing supplier asset",
+                "asset_type": "system",
+                "supplier": "Ghost Supplier Co",
+            },
+        ],
+    )
+    batch_id = upload.headers["location"].removeprefix("/imports/assets/")
+    preview = activities_client.get(f"/imports/assets/{batch_id}")
+    confirm_token = _extract_csrf(preview.text)
+    confirm = _asset_confirm(activities_client, batch_id, confirm_token)
+    assert confirm.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        suppliers = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Ghost Supplier Co")
+        ).all()
+        assert suppliers == []
 
 
 def test_asset_multiple_business_functions_matched_and_unmatched(

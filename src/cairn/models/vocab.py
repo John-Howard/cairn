@@ -162,6 +162,7 @@ class InformationAsset(ProposableMixin, AuditedBase):
     business_functions: Mapped[list[BusinessFunction]] = relationship(
         secondary=asset_businessfunction
     )
+    supplier: Mapped[LegalEntity | None] = relationship()
 
 
 class ThirdCountry(AuditedBase):

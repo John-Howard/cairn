@@ -228,6 +228,33 @@ def test_dashboard_asset_kpis(activities_client, activities_web_engine):
     assert "Assets without an Information Asset Owner" in response.text
 
 
+def test_dashboard_asset_kpi_excludes_proposed_supplier(
+    activities_client, activities_web_engine
+):
+    from cairn.models import EntryStatus, InformationAsset, LegalEntity, LegalEntityRoleType
+
+    with Session(activities_web_engine) as db:
+        supplier = LegalEntity(
+            label="Proposed Supplier Ltd",
+            role_type=LegalEntityRoleType.PROCESSOR,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        db.add(supplier)
+        db.flush()
+        db.add(
+            InformationAsset(
+                label="Linked Asset With Proposed Supplier",
+                supplier_entity_id=supplier.id,
+                contains_personal_data=True,
+            )
+        )
+        db.commit()
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    response = activities_client.get("/")
+    assert response.status_code == 200
+    assert '/assets?contains_personal_data=true">1</a>' in response.text
+
+
 def test_dashboard_no_commencement_watch_card_without_data(
     activities_client, activities_web_engine
 ):

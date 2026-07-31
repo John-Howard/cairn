@@ -70,7 +70,11 @@ def _asset_kpis(session: Session, today: date) -> dict:
         ).all()
     )
     undocumented = sum(
-        1 for asset in assets if evaluate_asset(asset, linked_counts.get(asset.id, 0)) is not None
+        1
+        for asset in assets
+        if any(
+            f.rule_id == "22" for f in evaluate_asset(asset, linked_counts.get(asset.id, 0))
+        )
     )
     without_iao = sum(1 for asset in assets if asset.iao_user_id is None)
     review_overdue = sum(

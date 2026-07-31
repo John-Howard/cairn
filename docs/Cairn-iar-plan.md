@@ -82,6 +82,7 @@ Existing machinery already carries asset→activity flow (inheritance, retention
 - **New engine rules** (continuing ids after 21, `[cairn governance]` tier):
   - **Rule 22 (WARN):** asset has `contains_personal_data` and is approved/in use, but no linked activity — undocumented processing candidate; the IAR-driven audit signal.
   - **Rule 23 (WARN):** active activity has data categories but no linked asset — the ROPA-side converse; every documented processing should name where the information lives.
+  - **Rule 24 (BLOCK, added 2026-07-31):** asset references reference data that is not approved — its supplier Legal Entity or a linked Security Measure sitting at `proposed`/`rejected`. The asset-side analogue of rule 18, enforced on asset approval; on an already-approved asset (the CSV import creates those) it surfaces as a gap flag rather than blocking anything.
 - **Dashboard KPIs:** assets by type; personal-data assets without a linked activity (rule 22 count); assets without an IAO; reviews overdue.
 - **Intake linkage:** the existing activity-intake wizard's systems question (H1) proposes into the same entity, so wizard-named systems and IAR records converge on one list — no change needed beyond renames.
 

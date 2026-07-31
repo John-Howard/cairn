@@ -7,8 +7,12 @@ from cairn.models import (
     AssetStatus,
     EntryStatus,
     InformationAsset,
+    LegalEntity,
+    LegalEntityRoleType,
     PersonalDataCategory,
     ProcessingActivity,
+    SecurityMeasure,
+    SecurityMeasureCategory,
 )
 from cairn.rules import evaluate, evaluate_asset
 from conftest import business_function
@@ -67,14 +71,14 @@ def test_rule22_not_applicable_when_proposed(session):
     )
     session.add(asset)
     session.flush()
-    assert evaluate_asset(asset, 0) is None
+    assert _rule_finding(evaluate_asset(asset, 0), "22") is None
 
 
 def test_rule22_not_applicable_when_not_personal_data(session):
     asset = InformationAsset(label="Non Personal Asset", contains_personal_data=False)
     session.add(asset)
     session.flush()
-    assert evaluate_asset(asset, 0) is None
+    assert _rule_finding(evaluate_asset(asset, 0), "22") is None
 
 
 def test_rule22_not_applicable_when_disposed(session):
@@ -83,14 +87,14 @@ def test_rule22_not_applicable_when_disposed(session):
     )
     session.add(asset)
     session.flush()
-    assert evaluate_asset(asset, 0) is None
+    assert _rule_finding(evaluate_asset(asset, 0), "22") is None
 
 
 def test_rule22_fires_when_approved_personal_data_no_links(session):
     asset = InformationAsset(label="Orphan Asset", contains_personal_data=True)
     session.add(asset)
     session.flush()
-    finding = evaluate_asset(asset, 0)
+    finding = _rule_finding(evaluate_asset(asset, 0), "22")
     assert finding is not None
     assert finding.rule_id == "22"
     assert finding.severity.value == "warn"
@@ -100,4 +104,92 @@ def test_rule22_clears_when_linked(session):
     asset = InformationAsset(label="Linked Asset", contains_personal_data=True)
     session.add(asset)
     session.flush()
-    assert evaluate_asset(asset, 1) is None
+    assert _rule_finding(evaluate_asset(asset, 1), "22") is None
+
+
+def test_rule24_fires_with_proposed_supplier(session):
+    supplier = LegalEntity(
+        label="Proposed Supplier Ltd",
+        role_type=LegalEntityRoleType.PROCESSOR,
+        entry_status=EntryStatus.PROPOSED,
+    )
+    session.add(supplier)
+    session.flush()
+    asset = InformationAsset(label="Asset With Proposed Supplier", supplier_entity_id=supplier.id)
+    session.add(asset)
+    session.flush()
+    finding = _rule_finding(evaluate_asset(asset, 0), "24")
+    assert finding is not None
+    assert finding.severity.value == "block"
+    assert "Proposed Supplier Ltd" in finding.message
+
+
+def test_rule24_fires_with_rejected_supplier(session):
+    supplier = LegalEntity(
+        label="Rejected Supplier Ltd",
+        role_type=LegalEntityRoleType.PROCESSOR,
+        entry_status=EntryStatus.REJECTED,
+    )
+    session.add(supplier)
+    session.flush()
+    asset = InformationAsset(label="Asset With Rejected Supplier", supplier_entity_id=supplier.id)
+    session.add(asset)
+    session.flush()
+    finding = _rule_finding(evaluate_asset(asset, 0), "24")
+    assert finding is not None
+    assert "Rejected Supplier Ltd" in finding.message
+
+
+def test_rule24_not_applicable_with_approved_supplier(session):
+    supplier = LegalEntity(
+        label="Approved Supplier Ltd", role_type=LegalEntityRoleType.PROCESSOR
+    )
+    session.add(supplier)
+    session.flush()
+    asset = InformationAsset(label="Asset With Approved Supplier", supplier_entity_id=supplier.id)
+    session.add(asset)
+    session.flush()
+    assert _rule_finding(evaluate_asset(asset, 0), "24") is None
+
+
+def test_rule24_fires_with_proposed_security_measure(session):
+    measure = SecurityMeasure(
+        label="Proposed Measure",
+        category=SecurityMeasureCategory.TECHNICAL,
+        entry_status=EntryStatus.PROPOSED,
+    )
+    session.add(measure)
+    asset = InformationAsset(label="Asset With Proposed Measure")
+    session.add(asset)
+    session.flush()
+    asset.security_measures.append(measure)
+    session.flush()
+    finding = _rule_finding(evaluate_asset(asset, 0), "24")
+    assert finding is not None
+    assert "Proposed Measure" in finding.message
+
+
+def test_rule24_not_applicable_when_clean(session):
+    asset = InformationAsset(label="Clean Asset")
+    session.add(asset)
+    session.flush()
+    assert _rule_finding(evaluate_asset(asset, 0), "24") is None
+
+
+def test_rule24_applies_even_when_asset_proposed(session):
+    supplier = LegalEntity(
+        label="Proposed Supplier Two",
+        role_type=LegalEntityRoleType.PROCESSOR,
+        entry_status=EntryStatus.PROPOSED,
+    )
+    session.add(supplier)
+    session.flush()
+    asset = InformationAsset(
+        label="Proposed Asset With Proposed Supplier",
+        supplier_entity_id=supplier.id,
+        entry_status=EntryStatus.PROPOSED,
+    )
+    session.add(asset)
+    session.flush()
+    finding = _rule_finding(evaluate_asset(asset, 0), "24")
+    assert finding is not None

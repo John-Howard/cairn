@@ -15,6 +15,7 @@ from cairn.models import (
     IntakeStatus,
     IntakeSubmission,
     LegalEntity,
+    LegalEntityRoleType,
     RetentionRule,
     SecurityMeasure,
 )
@@ -360,14 +361,110 @@ def test_unmatched_supplier_and_retention_recorded_as_notes_and_gap(
     asset_id = _submit(client, submission_id)
     with Session(engine) as db:
         asset = db.get(InformationAsset, asset_id)
-        assert asset.supplier_entity_id is None
         assert asset.default_retention_id is None
+        assert asset.supplier_entity_id is not None
         assert "Nonexistent Supplier Co" in asset.notes
         assert "Unknown retention rule name" in asset.notes
         gaps = db.scalars(select(IntakeGap).where(IntakeGap.submission_id == submission_id)).all()
         gap_codes = {g.question_code for g in gaps}
         assert "AS-D2_NAME" in gap_codes
         assert "AS-F1" in gap_codes
+
+
+def test_unmatched_supplier_creates_proposed_legal_entity(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start_asset(client, engine, name="System with new supplier")
+    _save_section(
+        client, submission_id, "D",
+        {"AS-D1": "Somewhere", "AS-D2": "yes", "AS-D2_NAME": "Nonexistent Supplier Co"},
+    )
+    asset_id = _submit(client, submission_id)
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        supplier = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Nonexistent Supplier Co")
+        ).one()
+        assert supplier.entry_status == EntryStatus.PROPOSED
+        assert supplier.role_type == LegalEntityRoleType.PROCESSOR
+        assert asset.supplier_entity_id == supplier.id
+        gaps = db.scalars(select(IntakeGap).where(IntakeGap.submission_id == submission_id)).all()
+        gap_codes = {g.question_code for g in gaps}
+        assert "AS-D2_NAME" in gap_codes
+
+
+def test_matching_supplier_links_without_creating_new_entity(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    with Session(engine) as db:
+        db.add(LegalEntity(label="Acme Cloud Ltd", role_type="data_supplier"))
+        db.commit()
+        before_count = len(db.scalars(select(LegalEntity)).all())
+
+    submission_id, asset_id = _full_asset_run(client, engine)
+
+    with Session(engine) as db:
+        after_count = len(db.scalars(select(LegalEntity)).all())
+        assert after_count == before_count
+        asset = db.get(InformationAsset, asset_id)
+        supplier = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Acme Cloud Ltd")
+        ).one()
+        assert asset.supplier_entity_id == supplier.id
+
+
+def test_rejected_supplier_name_is_not_matched_and_is_reproposed(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    with Session(engine) as db:
+        db.add(
+            LegalEntity(
+                label="Old Supplier Ltd",
+                role_type=LegalEntityRoleType.PROCESSOR,
+                entry_status=EntryStatus.REJECTED,
+            )
+        )
+        db.commit()
+        rejected_id = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Old Supplier Ltd")
+        ).one().id
+
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start_asset(client, engine, name="System with rejected supplier")
+    _save_section(
+        client, submission_id, "D",
+        {"AS-D1": "Somewhere", "AS-D2": "yes", "AS-D2_NAME": "Old Supplier Ltd"},
+    )
+    asset_id = _submit(client, submission_id)
+    with Session(engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        assert asset.supplier_entity_id != rejected_id
+        proposed = db.scalars(
+            select(LegalEntity).where(
+                LegalEntity.label == "Old Supplier Ltd",
+                LegalEntity.entry_status == EntryStatus.PROPOSED,
+            )
+        ).one()
+        assert asset.supplier_entity_id == proposed.id
+
+
+def test_asset_review_page_shows_supplier_proposal(
+    activities_client, activities_web_engine
+):
+    client, engine = activities_client, activities_web_engine
+    _login(client, engine, "Cody Contributor")
+    submission_id = _start_asset(client, engine, name="Reviewed asset with supplier")
+    _save_section(
+        client, submission_id, "D",
+        {"AS-D1": "Somewhere", "AS-D2": "yes", "AS-D2_NAME": "Brand New Supplier Ltd"},
+    )
+    page = client.get(f"/intake/{submission_id}/review").text
+    assert "Brand New Supplier Ltd" in page
 
 
 def test_asset_review_page_shows_security_measure_proposals(

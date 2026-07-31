@@ -23,6 +23,7 @@ from cairn.models import (
     ImportBatchStatus,
     InformationAsset,
     LegalEntity,
+    LegalEntityRoleType,
     PersonalDataCategory,
     PersonalDataSource,
     ProcessingActivity,
@@ -38,6 +39,7 @@ from cairn.models import (
     User,
 )
 from cairn.regime import resolve_regime
+from cairn.rules import Severity, evaluate_asset
 from cairn.templating import templates
 
 router = APIRouter()
@@ -461,6 +463,7 @@ class AssetRowReport:
     is_duplicate: bool = False
     security_measure_matches: list[tuple[str, str]] = field(default_factory=list)
     security_measure_proposals: list[str] = field(default_factory=list)
+    supplier_proposal: str | None = None
 
 
 def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowReport]:
@@ -469,7 +472,7 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
         bf.label.lower(): bf for bf in session.scalars(select(BusinessFunction)).all()
     }
     users_by_email = {u.email.lower(): u for u in session.scalars(select(User)).all() if u.email}
-    suppliers = {le.label.lower(): le for le in session.scalars(select(LegalEntity)).all()}
+    suppliers, supplier_rejected = _vocab_maps(session, LegalEntity)
     retention_rules = {
         r.label.lower(): r
         for r in session.scalars(select(RetentionRule)).all()
@@ -477,6 +480,7 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
     }
     measure_active, measure_rejected = _vocab_maps(session, SecurityMeasure)
     proposal_registry: dict[str, str] = {}
+    supplier_proposal_registry: dict[str, str] = {}
 
     reports = []
     for index, row in enumerate(rows, start=1):
@@ -572,13 +576,26 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
             values["next_review_date"] = None
 
         supplier_raw = (row.get("supplier") or "").strip()
+        supplier_proposal: str | None = None
+        supplier_pending = False
         if supplier_raw:
-            supplier = suppliers.get(supplier_raw.lower())
-            if supplier is None:
-                warnings.append(f"Unknown supplier: '{supplier_raw}' — leaving unset")
+            supplier_key = supplier_raw.lower()
+            supplier = suppliers.get(supplier_key)
+            if supplier is not None:
+                values["supplier_entity_id"] = supplier.id
+                supplier_pending = supplier.entry_status == EntryStatus.PROPOSED
+            elif supplier_key in supplier_rejected:
+                errors.append(f"'{supplier_raw}' was previously rejected")
                 values["supplier_entity_id"] = None
             else:
-                values["supplier_entity_id"] = supplier.id
+                values["supplier_entity_id"] = None
+                supplier_proposal = supplier_proposal_registry.setdefault(
+                    supplier_key, supplier_raw
+                )
+                warnings.append(
+                    f"Unknown supplier: '{supplier_raw}' — will be proposed as a new "
+                    "legal entity for approval"
+                )
         else:
             values["supplier_entity_id"] = None
 
@@ -596,11 +613,14 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
         measures_raw = (row.get("security_measures") or "").strip()
         measure_matches: list[tuple[str, str]] = []
         measure_proposals: list[str] = []
+        measure_pending = False
         for token_name in _split_names(measures_raw):
             key = token_name.lower()
             entry = measure_active.get(key)
             if entry is not None:
                 measure_matches.append((entry.id, entry.label))
+                if entry.entry_status == EntryStatus.PROPOSED:
+                    measure_pending = True
                 continue
             if key in measure_rejected:
                 errors.append(f"'{token_name}' was previously rejected")
@@ -608,6 +628,14 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
             canonical = proposal_registry.setdefault(key, token_name)
             if canonical not in measure_proposals:
                 measure_proposals.append(canonical)
+
+        if not is_duplicate and (
+            supplier_proposal or measure_proposals or supplier_pending or measure_pending
+        ):
+            warnings.append(
+                "This asset will be created as proposed — it references reference data "
+                "awaiting approval"
+            )
 
         reports.append(
             AssetRowReport(
@@ -618,6 +646,7 @@ def analyse_asset_rows(session: Session, rows: list[dict]) -> list[AssetRowRepor
                 is_duplicate=is_duplicate,
                 security_measure_matches=measure_matches,
                 security_measure_proposals=measure_proposals,
+                supplier_proposal=supplier_proposal,
             )
         )
     return reports
@@ -639,6 +668,21 @@ def apply_asset_batch(
         )
         session.add(entry)
         proposal_entities[key] = entry
+
+    supplier_names: dict[str, str] = {}
+    for report in reports:
+        if report.is_duplicate or not report.supplier_proposal:
+            continue
+        supplier_names.setdefault(report.supplier_proposal.lower(), report.supplier_proposal)
+    supplier_entities: dict[str, LegalEntity] = {}
+    for key, name in supplier_names.items():
+        entry = LegalEntity(
+            label=name,
+            role_type=LegalEntityRoleType.PROCESSOR,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        session.add(entry)
+        supplier_entities[key] = entry
     session.flush()
 
     assets = []
@@ -663,7 +707,8 @@ def apply_asset_batch(
             value = values[field_name]
             if value is not None:
                 setattr(asset, field_name, value)
-        asset.entry_status = EntryStatus.APPROVED
+        if report.supplier_proposal:
+            asset.supplier_entity_id = supplier_entities[report.supplier_proposal.lower()].id
         session.add(asset)
         session.flush()
         for bf_id in values["business_function_ids"]:
@@ -674,9 +719,13 @@ def apply_asset_batch(
             asset.security_measures.append(measure)
         for name in report.security_measure_proposals:
             asset.security_measures.append(proposal_entities[name.lower()])
+        blocked = any(f.severity == Severity.BLOCK for f in evaluate_asset(asset, 0))
+        asset.entry_status = EntryStatus.PROPOSED if blocked else EntryStatus.APPROVED
         assets.append(asset)
     session.flush()
-    return assets, [entry.id for entry in proposal_entities.values()]
+    proposal_ids = [entry.id for entry in proposal_entities.values()]
+    proposal_ids += [entry.id for entry in supplier_entities.values()]
+    return assets, proposal_ids
 
 
 def _asset_upload_response(

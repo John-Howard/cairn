@@ -532,7 +532,20 @@ RULES: list[Rule] = [
 ]
 
 
-def evaluate_asset(asset: InformationAsset, linked_activity_count: int) -> Finding | None:
+def _asset_unapproved_references(asset: InformationAsset) -> str | None:
+    entries = [asset.supplier, *asset.security_measures]
+    labels = {
+        getattr(entry, "label", None) or str(entry.id)
+        for entry in entries
+        if entry is not None
+        and getattr(entry, "entry_status", None) in (EntryStatus.PROPOSED, EntryStatus.REJECTED)
+    }
+    if labels:
+        return f"References vocabulary entries that are not approved: {', '.join(sorted(labels))}"
+    return None
+
+
+def _asset_undocumented(asset: InformationAsset, linked_activity_count: int) -> str | None:
     if asset.entry_status != EntryStatus.APPROVED:
         return None
     if not asset.contains_personal_data:
@@ -541,14 +554,21 @@ def evaluate_asset(asset: InformationAsset, linked_activity_count: int) -> Findi
         return None
     if linked_activity_count > 0:
         return None
-    return Finding(
-        rule_id="22",
-        severity=Severity.WARN,
-        message=(
-            "This asset holds personal data but is not linked to any processing activity — "
-            "possible undocumented processing"
-        ),
+    return (
+        "This asset holds personal data but is not linked to any processing activity — "
+        "possible undocumented processing"
     )
+
+
+def evaluate_asset(asset: InformationAsset, linked_activity_count: int) -> list[Finding]:
+    findings = []
+    message = _asset_undocumented(asset, linked_activity_count)
+    if message is not None:
+        findings.append(Finding(rule_id="22", severity=Severity.WARN, message=message))
+    message = _asset_unapproved_references(asset)
+    if message is not None:
+        findings.append(Finding(rule_id="24", severity=Severity.BLOCK, message=message))
+    return findings
 
 
 def evaluate(activity: ProcessingActivity, profile: OrganisationProfile) -> list[Finding]:

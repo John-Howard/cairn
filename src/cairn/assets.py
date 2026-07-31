@@ -33,7 +33,7 @@ from cairn.models import (
     User,
 )
 from cairn.regime import resolve_regime
-from cairn.rules import evaluate_asset
+from cairn.rules import Severity, evaluate_asset
 from cairn.templating import templates
 
 router = APIRouter()
@@ -329,9 +329,7 @@ def _gap_flags(asset: InformationAsset, linked_activity_count: int, today: date)
     gaps = []
     if asset.iao_user_id is None:
         gaps.append("No Information Asset Owner is set for this asset.")
-    finding = evaluate_asset(asset, linked_activity_count)
-    if finding is not None:
-        gaps.append(finding.message)
+    gaps.extend(finding.message for finding in evaluate_asset(asset, linked_activity_count))
     if asset.next_review_date is not None and asset.next_review_date < today:
         gaps.append(f"Review was due on {asset.next_review_date} and is now overdue.")
     return gaps
@@ -732,6 +730,12 @@ async def approve_asset(
     verify_csrf(request, form.get("csrf_token"))
     if asset.entry_status != EntryStatus.PROPOSED:
         raise HTTPException(status_code=422, detail="Entry is not pending approval")
+    if any(f.severity == Severity.BLOCK for f in evaluate_asset(asset, 0)):
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot approve: this asset references reference data that is not "
+            "approved yet",
+        )
     asset.entry_status = EntryStatus.APPROVED
     asset.change_note = "Proposal approved"
     session.flush()

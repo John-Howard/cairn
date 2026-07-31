@@ -8,6 +8,8 @@ from cairn.models import (
     AuditEvent,
     EntryStatus,
     InformationAsset,
+    LegalEntity,
+    LegalEntityRoleType,
     ProcessingActivity,
     RecordVersion,
     SecurityMeasure,
@@ -290,6 +292,73 @@ def test_contributor_cannot_approve(activities_client, activities_web_engine):
         f"/assets/{asset_id}/approve", data={"csrf_token": token}
     )
     assert response.status_code == 403
+
+
+def test_approve_blocked_by_proposed_supplier(activities_client, activities_web_engine):
+    with Session(activities_web_engine) as db:
+        supplier = LegalEntity(
+            label="Proposed Supplier Ltd",
+            role_type=LegalEntityRoleType.PROCESSOR,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        db.add(supplier)
+        db.commit()
+        supplier_id = supplier.id
+
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cody Contributor",
+        label="Asset With Proposed Supplier",
+        supplier_entity_id=supplier_id,
+    )
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    token = _extract_csrf(activities_client.get("/assets").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/approve", data={"csrf_token": token}
+    )
+    assert response.status_code == 422
+
+    with Session(activities_web_engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        assert asset.entry_status == EntryStatus.PROPOSED
+
+
+def test_approve_succeeds_once_supplier_is_approved(activities_client, activities_web_engine):
+    with Session(activities_web_engine) as db:
+        supplier = LegalEntity(
+            label="Supplier Ltd",
+            role_type=LegalEntityRoleType.PROCESSOR,
+            entry_status=EntryStatus.PROPOSED,
+        )
+        db.add(supplier)
+        db.commit()
+        supplier_id = supplier.id
+
+    asset_id = _create_asset(
+        activities_client,
+        activities_web_engine,
+        login_as="Cody Contributor",
+        label="Asset With Approved Supplier",
+        supplier_entity_id=supplier_id,
+    )
+
+    with Session(activities_web_engine) as db:
+        db.info["actor_id"] = _user_id(activities_web_engine, "Ada Approver")
+        supplier = db.get(LegalEntity, supplier_id)
+        supplier.entry_status = EntryStatus.APPROVED
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Ada Approver")
+    token = _extract_csrf(activities_client.get("/assets").text)
+    response = activities_client.post(
+        f"/assets/{asset_id}/approve", data={"csrf_token": token}
+    )
+    assert response.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        asset = db.get(InformationAsset, asset_id)
+        assert asset.entry_status == EntryStatus.APPROVED
 
 
 def test_edit_updates_fields_bumps_version_and_records_audit_event(

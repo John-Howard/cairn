@@ -23,7 +23,7 @@ class ProposableMixin:
     entry_status: Mapped[EntryStatus] = mapped_column(default=EntryStatus.APPROVED)
 
 
-class LegalEntity(AuditedBase):
+class LegalEntity(ProposableMixin, AuditedBase):
     __tablename__ = "legal_entity"
 
     label: Mapped[str]
@@ -162,6 +162,7 @@ class InformationAsset(ProposableMixin, AuditedBase):
     business_functions: Mapped[list[BusinessFunction]] = relationship(
         secondary=asset_businessfunction
     )
+    supplier: Mapped[LegalEntity | None] = relationship()
 
 
 class ThirdCountry(AuditedBase):

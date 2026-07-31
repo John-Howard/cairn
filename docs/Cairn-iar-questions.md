@@ -64,7 +64,7 @@
 |---|---|---|---|
 | AS-D1 | Where is it kept? | A building or room for paper; a supplier, data centre or "the cloud" for systems | `location` |
 | AS-D2 | Is it provided or hosted by an outside company? | | (gates AS-D2_NAME / AS-D3 below) |
-| AS-D2_NAME | *(if AS-D2 = yes)* Which company? | | supplier match → `supplier_entity_id`, else `notes` + gap |
+| AS-D2_NAME | *(if AS-D2 = yes)* Which company? | | supplier match → `supplier_entity_id`; no match → a **proposed** `LegalEntity` (role type processor) is created, linked, and queued for approval, plus `notes` + gap |
 | AS-D3 | *(if AS-D2 = yes)* Is any of the information kept outside the UK? Where? | | `hosting_country` |
 
 > **Note on the split.** The source plan (§4) posed this as two questions — "is it hosted by an outside company, which one" and "is it kept outside the UK" conditional on the first being answered. Cairn's `depends_on` configuration can only express "conditional on a specific answer value", not "conditional on any answer being given" — so the naming question is split out as its own code (AS-D2_NAME), both AS-D2_NAME and AS-D3 conditional on AS-D2 = yes. This is the same pattern already used for the activity question set's C3/C3_DETAIL pair.

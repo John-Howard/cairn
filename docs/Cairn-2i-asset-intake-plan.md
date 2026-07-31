@@ -42,7 +42,7 @@ The intake tables currently assume a single question set. Changes, in one forwar
 - **Populates handlers** — a second registry mapping the §4 codes onto `InformationAsset` fields. Notable mappings:
   - *Business functions are multi-valued* (requirement recorded 2026-07-28, `asset_businessfunction` junction): the respondent's department from the start screen becomes the asset's first business function, and AS-B3 ("which other teams use it?") adds further label-matched functions — unmatched names land in `notes` with a gap.
   - *IAO named in answers is text, not an account pick.* Respondents rarely know user emails; the named person lands in `notes` ("Named senior owner: …") plus a gap, and the curator binds `iao_user_id` on approval. Deny-by-default account linking is preserved.
-  - *Supplier and retention answers match by label* (case-insensitive) against Legal Entity / Retention Rule; unmatched values are recorded in `notes` with a gap — neither vocabulary is auto-proposable from a bare name (same rule as the CSV import).
+  - *Supplier and retention answers match by label* (case-insensitive) against Legal Entity / Retention Rule. **Revised 2026-07-31:** an unmatched supplier now becomes a proposed Legal Entity (role type `processor`), linked to the asset and queued for approval, still with the `notes` line and the gap so a curator confirms the role type and de-duplicates — the asset CSV import does the same. Retention keeps the original treatment (`notes` + gap only): a Retention Rule needs a period and a trigger, which a bare name cannot supply.
   - *Security measures* use the existing `VOCAB_MULTI` kind against the security-measure vocabulary, proposing unmatched entries.
 - **RBAC:** same as activity intake — contributors and above run it, scoped to their function; curators/DPO see all submissions.
 - **No new engine rules.** Rule 22 already provides the follow-through signal once assets are approved.
@@ -84,7 +84,7 @@ To be extracted, on sign-off, into its own document (*Cairn IAR Question Set v0.
 | AS-C1 | C — The information it holds | Does it hold information about people? | Staff, the public, anyone — however routine | yes_no | `contains_personal_data` |
 | AS-C2 | C *(if C1 = yes)* | Roughly what information about people does it hold? | Names and contact details? Health information? Photographs or recordings? | textarea | `notes` (curation context) |
 | AS-D1 | D — Where it is | Where is it kept? | A building or room for paper; a supplier, data centre or "the cloud" for systems | text | `location` |
-| AS-D2 | D | Is it provided or hosted by an outside company? Which one? | | text | supplier match → `supplier_entity_id`, else `notes` + gap |
+| AS-D2 | D | Is it provided or hosted by an outside company? Which one? | | text | supplier match → `supplier_entity_id`, else proposed `LegalEntity` (processor) linked + `notes` + gap |
 | AS-D3 | D *(if D2 answered)* | Is any of the information kept outside the UK? Where? | | text | `hosting_country` |
 | AS-E1 | E — How it's protected | How is it protected? | Locked rooms or cabinets, passwords, restricted access, encryption — pick all that apply or suggest new ones | vocab_multi (security measures) | `security_measures` (+ proposals) |
 | AS-F1 | F — Keeping and disposing | How long is the information kept, and is that written down anywhere? | | text | retention match → `default_retention_id`, else `notes` + gap |

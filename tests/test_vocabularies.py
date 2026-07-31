@@ -337,13 +337,71 @@ def test_curator_created_recipient_is_approved(activities_client, activities_web
         assert entry.entry_status == EntryStatus.APPROVED
 
 
+def test_contributor_can_propose_legal_entity(activities_client, activities_web_engine):
+    _login(activities_client, activities_web_engine, "Cody Contributor")
+    new_page = activities_client.get("/vocabularies/legal-entities/new")
+    assert new_page.status_code == 200
+    token = _extract_csrf(new_page.text)
+
+    created = activities_client.post(
+        "/vocabularies/legal-entities",
+        data={"csrf_token": token, "label": "Proposed Supplier Ltd", "role_type": "processor"},
+    )
+    assert created.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        entry = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Proposed Supplier Ltd")
+        ).one()
+        assert entry.entry_status == EntryStatus.PROPOSED
+
+
+def test_proposed_legal_entity_appears_in_pending_proposals_and_can_be_approved(
+    activities_client, activities_web_engine
+):
+    from cairn.vocabularies import pending_proposals_count
+
+    with Session(activities_web_engine) as db:
+        db.add(
+            LegalEntity(
+                label="Pending Supplier Ltd",
+                role_type="processor",
+                entry_status=EntryStatus.PROPOSED,
+            )
+        )
+        db.commit()
+
+    _login(activities_client, activities_web_engine, "Cara Curator")
+    with Session(activities_web_engine) as db:
+        assert pending_proposals_count(db) >= 1
+
+    listing = activities_client.get("/vocabularies/legal-entities").text
+    assert "Pending Supplier Ltd" in listing
+    assert "Proposed" in listing
+
+    with Session(activities_web_engine) as db:
+        entry_id = db.scalars(
+            select(LegalEntity).where(LegalEntity.label == "Pending Supplier Ltd")
+        ).one().id
+
+    token = _vocab_token(activities_client)
+    approved = activities_client.post(
+        f"/vocabularies/legal-entities/{entry_id}/approve", data={"csrf_token": token}
+    )
+    assert approved.status_code == 302
+
+    with Session(activities_web_engine) as db:
+        entry = db.get(LegalEntity, entry_id)
+        assert entry.entry_status == EntryStatus.APPROVED
+
+
 def test_contributor_cannot_propose_to_non_proposal_vocab(activities_client, activities_web_engine):
     _login(activities_client, activities_web_engine, "Cody Contributor")
     token = _vocab_token(activities_client)
-    assert activities_client.get("/vocabularies/legal-entities/new").status_code == 403
+    assert activities_client.get("/vocabularies/business-functions/new").status_code == 403
     response = activities_client.post(
-        "/vocabularies/legal-entities",
-        data={"csrf_token": token, "label": "Nope", "role_type": "partner_agency"},
+        "/vocabularies/business-functions",
+        data={"csrf_token": token, "label": "Nope"},
     )
     assert response.status_code == 403
 
